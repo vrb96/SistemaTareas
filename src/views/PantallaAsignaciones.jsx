@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit, Trash2, Plus, Calendar, Clock } from 'lucide-react';
+import { X, Edit, Trash2, Plus } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
@@ -11,9 +11,10 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
     if (!claseActual?.id_clase) return;
     setCargando(true);
 
+    // Consulta con conteo de entregas hijas
     const { data, error } = await supabase
       .from('asignacion')
-      .select('*')
+      .select('*, entrega(id_entrega, fecha_limite)')
       .eq('id_clase', claseActual.id_clase)
       .eq('estado', 'Activa')
       .order('fecha_creacion', { ascending: false });
@@ -31,9 +32,13 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
     setModalActual(accion);
   };
 
+  const seleccionarAsignacion = (tarea) => {
+    setAsignacionSeleccionada(tarea);
+    setVistaActual('PantallaEntregas');
+  };
+
   return (
     <div className="flex h-[calc(100vh-73px)]">
-      {/* Barra lateral */}
       <div className="w-1/5 border-r-2 border-gray-300 p-4 flex flex-col gap-4 bg-white">
         <button onClick={() => setVistaActual('PantallaPrincipal')} className="text-xl font-bold mb-4 text-left hover:text-red-500">
           <X size={30} />
@@ -46,7 +51,6 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
         </button>
       </div>
 
-      {/* Contenido principal */}
       <div className="w-4/5 p-8 overflow-y-auto">
         <div className="flex justify-between items-center mb-8 border-b-2 border-gray-200 pb-4">
           <h1 className={`text-[28pt] font-bold ${theme.textSuperficie} ${theme.font}`}>
@@ -69,37 +73,27 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
             {asignaciones.map((tarea) => (
               <div
                 key={tarea.id_asignacion}
-                className={`${theme.bgContenedor} p-6 rounded-lg shadow-md border border-gray-300 relative flex flex-col justify-between min-h-[220px]`}
+                onClick={() => seleccionarAsignacion(tarea)}
+                className={`${theme.bgPrimario} text-white p-6 rounded-lg text-center flex flex-col justify-center items-center h-52 cursor-pointer relative shadow-lg hover:bg-blue-800 transition`}
               >
-                <div>
-                  <h3 className={`text-[20pt] font-bold mb-2 pr-16 ${theme.textContenedor} ${theme.font}`}>
-                    {tarea.titulo}
-                  </h3>
-                  <p className={`text-[14pt] text-gray-700 mb-4 whitespace-pre-line ${theme.font}`}>
-                    {tarea.descripcion || 'Sin descripción'}
-                  </p>
-                </div>
+                <h3 className={`font-bold text-[18pt] mb-1 ${theme.font}`}>{tarea.titulo}</h3>
+                <p className={`text-[14pt] text-blue-100 mb-2 line-clamp-2 ${theme.font}`}>{tarea.descripcion || 'Sin descripción'}</p>
+                <p className={`text-[13pt] text-blue-200 ${theme.font}`}>
+                  Total de Entregas: {tarea.entrega ? tarea.entrega.length : 0}
+                </p>
 
-                <div className="border-t border-gray-300 pt-3 flex flex-col gap-1 text-[13pt] text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <Calendar size={18} className="text-[#465d91]" />
-                    <span>Límite: {tarea.fecha_limite || 'Sin fecha asignada'}</span>
-                  </div>
-                  {tarea.hora_limite && (
-                    <div className="flex items-center gap-2">
-                      <Clock size={18} className="text-[#465d91]" />
-                      <span>Hora: {tarea.hora_limite.slice(0, 5)} hrs</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="absolute top-4 right-4 flex gap-3">
-                  <button onClick={() => abrirModal('EditarAsignacion', tarea)} className="text-blue-600 hover:scale-110 transition">
-                    <Edit size={22} />
+                <div className="absolute bottom-2 right-2 flex gap-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); abrirModal('EditarAsignacion', tarea); }}
+                    className="hover:text-blue-300 transition"
+                  >
+                    <Edit size={20} />
                   </button>
-                  <button onClick={() => abrirModal('EliminarAsignacion', tarea)} className="text-red-600 hover:scale-110 transition">
-                    <Trash2 size={22} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); abrirModal('EliminarAsignacion', tarea); }}
+                    className="hover:text-red-300 transition"
+                  >
+                    <Trash2 size={20} />
                   </button>
                 </div>
               </div>

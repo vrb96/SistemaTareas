@@ -6,8 +6,6 @@ import { supabase } from '../supa/supabaseClient';
 export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalActual }) => {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [fechaLimite, setFechaLimite] = useState('');
-  const [horaLimite, setHoraLimite] = useState('23:59');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,8 +15,6 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
     if (asignacionActual && accion !== 'CrearAsignacion') {
       setTitulo(asignacionActual.titulo || '');
       setDescripcion(asignacionActual.descripcion || '');
-      setFechaLimite(asignacionActual.fecha_limite || '');
-      setHoraLimite(asignacionActual.hora_limite || '23:59');
     }
   }, [asignacionActual, accion]);
 
@@ -37,26 +33,14 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
       } else if (accion === 'EditarAsignacion') {
         const { error: dbError } = await supabase
           .from('asignacion')
-          .update({
-            titulo: titulo.trim(),
-            descripcion: descripcion.trim(),
-            fecha_limite: fechaLimite || null,
-            hora_limite: horaLimite || null
-          })
+          .update({ titulo: titulo.trim(), descripcion: descripcion.trim() })
           .eq('id_asignacion', asignacionActual.id_asignacion);
         if (dbError) throw dbError;
       } else {
         if (!titulo.trim()) throw new Error('El título es obligatorio');
         const { error: dbError } = await supabase
           .from('asignacion')
-          .insert([{
-            id_clase: idClase,
-            titulo: titulo.trim(),
-            descripcion: descripcion.trim(),
-            fecha_limite: fechaLimite || null,
-            hora_limite: horaLimite || null,
-            estado: 'Activa'
-          }]);
+          .insert([{ id_clase: idClase, titulo: titulo.trim(), descripcion: descripcion.trim(), estado: 'Activa' }]);
         if (dbError) throw dbError;
       }
 
@@ -68,19 +52,14 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
     }
   };
 
-  const getTituloModal = () => {
-    if (esBaja) return '¿Desea dar de baja la asignación?';
-    return accion === 'EditarAsignacion' ? 'Editar Asignación' : 'Crear Asignación';
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div className={`${theme.bgContenedor} p-8 rounded-lg shadow-xl w-[500px] border border-gray-300 relative`}>
         <button onClick={() => setModalActual(null)} className="absolute top-2 right-2 text-gray-700 hover:text-red-500 font-bold">
-          <X size={24} />
+          <X size={24}/>
         </button>
         <h2 className={`text-[22pt] font-bold mb-6 text-center ${esBaja ? 'text-red-600' : theme.textContenedor} ${theme.font}`}>
-          {getTituloModal()}
+          {esBaja ? '¿Desea dar de baja la asignación?' : (accion === 'EditarAsignacion' ? 'Editar Asignación' : 'Crear Asignación')}
         </h2>
 
         {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{error}</div>}
@@ -94,10 +73,9 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
               onChange={(e) => setTitulo(e.target.value)}
               disabled={esBaja}
               className="w-full p-2 border border-gray-400 rounded bg-white text-[16pt]"
-              placeholder="Ej. Tarea 1: Prototipos"
+              placeholder="Ej. Proyecto Final"
             />
           </div>
-
           <div>
             <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Descripción:</label>
             <textarea
@@ -106,33 +84,9 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
               disabled={esBaja}
               rows="3"
               className="w-full p-2 border border-gray-400 rounded bg-white text-[16pt]"
-              placeholder="Instrucciones de la tarea..."
+              placeholder="Instrucciones generales..."
             />
           </div>
-
-          {!esBaja && (
-            <div className="flex gap-4">
-              <div className="w-1/2">
-                <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Fecha Límite:</label>
-                <input
-                  type="date"
-                  value={fechaLimite}
-                  onChange={(e) => setFechaLimite(e.target.value)}
-                  className="w-full p-2 border border-gray-400 rounded bg-white text-[15pt]"
-                />
-              </div>
-              <div className="w-1/2">
-                <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Hora Límite:</label>
-                <input
-                  type="time"
-                  value={horaLimite}
-                  onChange={(e) => setHoraLimite(e.target.value)}
-                  className="w-full p-2 border border-gray-400 rounded bg-white text-[15pt]"
-                />
-              </div>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={cargando}

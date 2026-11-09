@@ -84,6 +84,7 @@ export const ModalCrearClase = ({ setModalActual }) => {
               <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} 
                       className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]">
                 <option value="Enero-Junio">Enero-Junio</option>
+                <option value="Verano">Verano</option>
                 <option value="Agosto-Diciembre">Agosto-Diciembre</option>
               </select>
             </div>

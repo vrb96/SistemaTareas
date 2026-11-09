@@ -55,7 +55,7 @@ export const ModalCargaMasiva = ({ setModalActual, idClase }) => {
         const apMaterno = partesNombre.length > 1 ? partesNombre[1] : '-';
         const nombreReal = partesNombre.length > 2 ? partesNombre.slice(2).join(' ') : 'Sin Nombre';
 
-        const correo = `${datoControl}@ittixtla.edu.mx`;
+        const correo = `${datoControl}@chilpancingo.tecnm.mx`;
         const passwordTemporal = `${datoControl}2026`;
 
         // Agregar a la lista para el CSV de descarga

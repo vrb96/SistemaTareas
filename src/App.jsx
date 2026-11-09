@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
 import { theme } from './theme';
-
-// Importación de Vistas
 import PantallaPrincipal from './views/PantallaPrincipal';
 import PantallaClase from './views/PantallaClase';
 import PantallaAsignaciones from './views/PantallaAsignaciones';
 import PantallaEntregas from './views/PantallaEntregas';
-
-// Importación de Modales
 import { ModalCrearClase } from './components/ModalCrearClase';
 import { ModalRegistrarAlumno } from './components/ModalRegistrarAlumno';
 import { ModalCargaMasiva, ModalDescargaCredenciales } from './components/ModalCargaMasiva';
 import { ModalAsignacion } from './components/ModalAsignacion';
+import { ModalEntrega } from './components/ModalEntrega';
+import { ModalEditarClase } from './components/ModalEditarClase';
+import { ModalGestionAlumno } from './components/ModalGestionAlumno';
 
 export default function App() {
   const [vistaActual, setVistaActual] = useState('PantallaPrincipal');
@@ -20,6 +19,8 @@ export default function App() {
   const [claseSeleccionada, setClaseSeleccionada] = useState(null);
   const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null);
   const [rolTemporal, setRolTemporal] = useState('Profesor'); // 'Profesor' | 'Alumno' | 'Administrador'
+  const [entregaSeleccionada, setEntregaSeleccionada] = useState(null);
+  const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
 
   return (
     <div className={`${theme.bgSuperficie} min-h-screen relative`}>
@@ -45,14 +46,6 @@ export default function App() {
         />
       )}
 
-      {vistaActual === 'PantallaClase' && (
-        <PantallaClase
-          setVistaActual={setVistaActual}
-          setModalActual={setModalActual}
-          claseActual={claseSeleccionada}
-        />
-      )}
-
       {vistaActual === 'PantallaAsignaciones' && (
         <PantallaAsignaciones
           setVistaActual={setVistaActual}
@@ -71,9 +64,38 @@ export default function App() {
         />
       )}
 
+      {vistaActual === 'PantallaEntregas' && (
+        <PantallaEntregas
+          setVistaActual={setVistaActual}
+          setModalActual={setModalActual}
+          asignacionActual={asignacionSeleccionada}
+          setEntregaSeleccionada={setEntregaSeleccionada}
+        />
+      )}
+
+      {vistaActual === 'PantallaClase' && (
+        <PantallaClase
+          setVistaActual={setVistaActual}
+          setModalActual={setModalActual}
+          claseActual={claseSeleccionada}
+          setAlumnoSeleccionado={setAlumnoSeleccionado}
+        />
+      )}
+
       {/* Ruteador de Modales */}
       {modalActual === 'CrearClase' && (
         <ModalCrearClase setModalActual={setModalActual} />
+      )}
+
+      {modalActual === 'CrearClase' && (
+        <ModalCrearClase setModalActual={setModalActual} />
+      )}
+
+      {modalActual === 'EditarClase' && (
+        <ModalEditarClase
+          claseAEditar={claseSeleccionada}
+          setModalActual={setModalActual}
+        />
       )}
 
       {modalActual === 'RegistrarAlumno' && (
@@ -92,6 +114,27 @@ export default function App() {
 
       {modalActual === 'ModalDescarga' && (
         <ModalDescargaCredenciales setModalActual={setModalActual} />
+      )}
+
+      {['CrearEntrega', 'EditarEntrega', 'EliminarEntrega'].includes(modalActual) && (
+        <ModalEntrega
+          accion={modalActual}
+          idAsignacion={asignacionSeleccionada?.id_asignacion}
+          entregaActual={entregaSeleccionada}
+          todasLasEntregas={listaEntregasActuales}
+          setModalActual={setModalActual}
+          onActualizacion={() => cargarEntregas()}
+        />
+      )}
+
+      {['EditarAlumno', 'EliminarAlumno', 'ReactivarAlumno'].includes(modalActual) && (
+        <ModalGestionAlumno
+          accion={modalActual}
+          alumnoItem={alumnoSeleccionado}
+          idClase={claseSeleccionada?.id_clase}
+          setModalActual={setModalActual}
+          onActualizacion={() => window.location.reload()}
+        />
       )}
 
       {['CrearAsignacion', 'EditarAsignacion', 'EliminarAsignacion'].includes(modalActual) && (
