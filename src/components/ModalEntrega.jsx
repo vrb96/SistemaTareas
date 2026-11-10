@@ -3,16 +3,18 @@ import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export const ModalEntrega = ({ 
-  accion, 
-  idAsignacion, 
-  entregaActual, 
-  todasLasEntregas = [], 
-  setModalActual, 
-  onActualizacion 
+export const ModalEntrega = ({
+  accion,
+  idAsignacion,
+  entregaActual,
+  todasLasEntregas = [],
+  setModalActual,
+  onActualizacion
 }) => {
   const [fechaLimite, setFechaLimite] = useState('');
   const [horaLimite, setHoraLimite] = useState('23:59');
+  const [fechaCierre, setFechaCierre] = useState('');
+  const [horaCierre, setHoraCierre] = useState('23:59');
   const [instrucciones, setInstrucciones] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -28,11 +30,13 @@ export const ModalEntrega = ({
     if (entregaActual && !esCrear) {
       setFechaLimite(entregaActual.fecha_limite || '');
       setHoraLimite(entregaActual.hora_limite?.slice(0, 5) || '23:59');
+      setFechaCierre(entregaActual.fecha_cierre || entregaActual.fecha_limite || '');
+      setHoraCierre(entregaActual.hora_cierre?.slice(0, 5) || '23:59');
       setInstrucciones(entregaActual.instrucciones || '');
     }
   }, [entregaActual, accion]);
 
-  // Validaciones de fecha y hora según RF017 y RF018
+  // Validaciones cronológicas
   const validarFechas = () => {
     const ahora = new Date();
     const fechaHoraIngresada = new Date(`${fechaLimite}T${horaLimite}:00`);
@@ -44,6 +48,15 @@ export const ModalEntrega = ({
     // Regla: Posterior al momento actual
     if (fechaHoraIngresada <= ahora) {
       throw new Error('La fecha y hora límite deben ser posteriores al momento actual.');
+    }
+
+    // Validación de Fecha de Cierre (debe ser >= Fecha Límite de Entrega)
+    const cierreFinalFecha = fechaCierre || fechaLimite;
+    const cierreFinalHora = horaCierre || horaLimite;
+    const fechaHoraCierreObj = new Date(`${cierreFinalFecha}T${cierreFinalHora}:00`);
+
+    if (fechaHoraCierreObj < fechaHoraIngresada) {
+      throw new Error('La fecha y hora de cierre definitivo no pueden ser anteriores a la fecha límite del alumno.');
     }
 
     if (esCrear) {
@@ -60,7 +73,7 @@ export const ModalEntrega = ({
     if (esEditar) {
       // Regla RF018: Posterior a la anterior y anterior a la siguiente
       const indice = todasLasEntregas.findIndex(e => e.id_entrega === entregaActual.id_entrega);
-      
+
       if (indice > 0) {
         const anterior = todasLasEntregas[indice - 1];
         const fechaHoraAnt = new Date(`${anterior.fecha_limite}T${anterior.hora_limite}`);
@@ -112,12 +125,18 @@ export const ModalEntrega = ({
       } else if (esEditar) {
         validarFechas();
 
+        // Si el profesor deja vacío el cierre, se asume igual a la fecha límite
+        const fechaCierreFinal = fechaCierre || fechaLimite;
+        const horaCierreFinal = horaCierre || horaLimite;
+
         // RF018: Si la nueva fecha es futura y estaba cerrada, vuelve a estar abierta
         const { error: dbError } = await supabase
           .from('entrega')
           .update({
             fecha_limite: fechaLimite,
             hora_limite: horaLimite,
+            fecha_cierre: fechaCierreFinal,
+            hora_cierre: horaCierreFinal,
             instrucciones: instrucciones.trim(),
             estado_cierre: false // reabierta
           })
@@ -128,6 +147,9 @@ export const ModalEntrega = ({
       } else if (esCrear) {
         validarFechas();
 
+        const fechaCierreFinal = fechaCierre || fechaLimite;
+        const horaCierreFinal = horaCierre || horaLimite;
+
         // RF017: Guardado con consecutivo automático y estado_cierre false
         const { error: dbError } = await supabase
           .from('entrega')
@@ -136,6 +158,8 @@ export const ModalEntrega = ({
             numero_entrega: siguienteConsecutivo,
             fecha_limite: fechaLimite,
             hora_limite: horaLimite,
+            fecha_cierre: fechaCierreFinal,
+            hora_cierre: horaCierreFinal,
             instrucciones: instrucciones.trim(),
             estado_cierre: false
           }]);
@@ -154,20 +178,20 @@ export const ModalEntrega = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className={`${theme.bgContenedor} p-8 rounded-lg shadow-xl w-[520px] border border-gray-300 relative`}>
+      <div className={`${theme.bgContenedor} p-8 rounded-lg shadow-xl w-[560px] border border-gray-300 relative`}>
         <button
           onClick={() => setModalActual(null)}
           className="absolute top-2 right-2 text-gray-700 hover:text-red-500 font-bold"
         >
-          <X size={24}/>
+          <X size={24} />
         </button>
 
         <h2 className={`text-[22pt] font-bold mb-6 text-center ${esEliminar ? 'text-red-600' : theme.textContenedor} ${theme.font}`}>
-          {esEliminar 
-            ? `¿Desea eliminar ${entregaActual?.numero_entrega}?` 
-            : esEditar 
-            ? `Editar ${entregaActual?.numero_entrega}` 
-            : `Crear ${siguienteConsecutivo}`}
+          {esEliminar
+            ? `¿Desea eliminar ${entregaActual?.numero_entrega}?`
+            : esEditar
+              ? `Editar ${entregaActual?.numero_entrega}`
+              : `Crear ${siguienteConsecutivo}`}
         </h2>
 
         {error && (
@@ -183,36 +207,78 @@ export const ModalEntrega = ({
             </p>
           ) : (
             <>
-              <div className="flex gap-4">
-                <div className="w-1/2">
-                  <label className={`text-[14pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
-                    Fecha Límite:
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={fechaLimite}
-                    onChange={(e) => setFechaLimite(e.target.value)}
-                    className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
-                  />
-                </div>
-                <div className="w-1/2">
-                  <label className={`text-[14pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
-                    Hora Límite:
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={horaLimite}
-                    onChange={(e) => setHoraLimite(e.target.value)}
-                    className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
-                  />
+              {/* Sección 1: Fecha Límite para Alumnos */}
+              <div className="bg-white p-3 rounded border border-gray-300">
+                <span className="block text-[12pt] font-bold text-blue-700 mb-2 uppercase tracking-wide">
+                  Fecha y Hora Límite (Visible para Alumnos)
+                </span>
+                <div className="flex gap-4">
+                  <div className="w-1/2">
+                    <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
+                      Fecha Límite:
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={fechaLimite}
+                      onChange={(e) => {
+                        setFechaLimite(e.target.value);
+                        if (!fechaCierre) setFechaCierre(e.target.value);
+                      }}
+                      className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
+                    />
+                  </div>
+                  <div className="w-1/2">
+                    <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
+                      Hora Límite:
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={horaLimite}
+                      onChange={(e) => setHoraLimite(e.target.value)}
+                      className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Sección 2: Fecha de Cierre Definitivo (Exclusivo Docente) */}
+              <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                <span className="block text-[12pt] font-bold text-[#465d91] mb-2 uppercase tracking-wide">
+                  Cierre Definitivo (Solo Profesor)
+                </span>
+                <div className="flex gap-4">
+                  <div className="w-1/2">
+                    <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
+                      Fecha de Cierre:
+                    </label>
+                    <input
+                      type="date"
+                      value={fechaCierre}
+                      onChange={(e) => setFechaCierre(e.target.value)}
+                      placeholder={fechaLimite}
+                      className="w-full p-2 border border-blue-300 rounded bg-white text-[14pt]"
+                    />
+                  </div>
+                  <div className="w-1/2">
+                    <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>
+                      Hora de Cierre:
+                    </label>
+                    <input
+                      type="time"
+                      value={horaCierre}
+                      onChange={(e) => setHoraCierre(e.target.value)}
+                      className="w-full p-2 border border-blue-300 rounded bg-white text-[14pt]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Instrucciones */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className={`text-[14pt] ${theme.textContenedor} ${theme.font}`}>
+                  <label className={`text-[13pt] ${theme.textContenedor} ${theme.font}`}>
                     Instrucciones (opcional):
                   </label>
                   <span className="text-[11pt] text-gray-500">
@@ -223,8 +289,8 @@ export const ModalEntrega = ({
                   value={instrucciones}
                   maxLength={1000}
                   onChange={(e) => setInstrucciones(e.target.value)}
-                  rows="4"
-                  className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
+                  rows="3"
+                  className="w-full p-2 border border-gray-400 rounded bg-white text-[13pt]"
                   placeholder="Instrucciones específicas para esta entrega..."
                 />
               </div>
@@ -234,7 +300,7 @@ export const ModalEntrega = ({
           <button
             type="submit"
             disabled={cargando}
-            className={`${esEliminar ? theme.bgError : theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-4 rounded ${theme.font} transition disabled:opacity-50`}
+            className={`${esEliminar ? theme.bgError : theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-2 rounded ${theme.font} transition disabled:opacity-50`}
           >
             {cargando ? 'Procesando...' : (esEliminar ? 'Confirmar Eliminación' : 'Guardar Entrega')}
           </button>

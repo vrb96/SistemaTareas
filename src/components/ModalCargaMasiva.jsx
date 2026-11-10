@@ -51,7 +51,7 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
         const nombreReal = partesNombre.length > 2 ? partesNombre.slice(2).join(' ') : 'Sin Nombre';
 
         // Dominio institucional correcto
-        const correo = `${datoControl}@chilpancingo.itch.mx`;
+        const correo = `l${datoControl}@chilpancingo.tecnm.mx`;
         const passwordTemporal = `${datoControl}2026`;
 
         credencialesGeneradas.push({
