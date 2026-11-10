@@ -3,7 +3,7 @@ import { X, Edit, Trash2, Plus } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export default function PantallaAsignaciones({ setVistaActual, setModalActual, claseActual, setAsignacionSeleccionada }) {
+export default function PantallaAsignaciones({ setVistaActual, setModalActual, claseActual, setAsignacionSeleccionada, actualizador }) {
   const [asignaciones, setAsignaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -25,7 +25,7 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
 
   useEffect(() => {
     cargarAsignaciones();
-  }, [claseActual]);
+  }, [claseActual, actualizador]);
 
   const abrirModal = (accion, asignacion = null) => {
     setAsignacionSeleccionada(asignacion);

@@ -21,8 +21,8 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
       if (claseAEditar?.periodo_escolar) {
         const partes = claseAEditar.periodo_escolar.split(' ');
         if (partes.length === 2) {
-          setPeriodo(partes[0]); // Seleccionará 'Verano' automáticamente
-          setAnio(partes[1]);     // Colocará el año correspondiente
+          setPeriodo(partes[0]);
+          setAnio(partes[1]);
         }
       }
     }
@@ -54,12 +54,12 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
 
       if (updateError) throw updateError;
 
-      setModalActual(null);
+      // Se notifica la actualización y se cierra sin recargar toda la ventana
       if (onClaseActualizada) {
         onClaseActualizada();
-      } else {
-        window.location.reload();
       }
+      setModalActual(null);
+
     } catch (err) {
       setError(err.message);
     } finally {

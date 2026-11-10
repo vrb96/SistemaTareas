@@ -3,7 +3,7 @@ import { X, Edit, Trash2, UserCheck } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export default function PantallaClase({ setVistaActual, setModalActual, claseActual, setAlumnoSeleccionado }) {
+export default function PantallaClase({ setVistaActual, setModalActual, claseActual, setAlumnoSeleccionado, actualizador }) {
   const [alumnos, setAlumnos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('Activa');
   const [busqueda, setBusqueda] = useState('');
@@ -36,7 +36,7 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
 
   useEffect(() => {
     cargarAlumnos();
-  }, [claseActual, filtroEstado]);
+  }, [claseActual, filtroEstado, actualizador]);
 
   const cambiarParticipacion = async (idInscripcion, nuevoValor) => {
     await supabase

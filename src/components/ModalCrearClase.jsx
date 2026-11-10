@@ -3,7 +3,8 @@ import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export const ModalCrearClase = ({ setModalActual }) => {
+// 1. Recibimos onActualizacion en las props
+export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
   const [nombre, setNombre] = useState('');
   const [clave, setClave] = useState('');
   const [grupo, setGrupo] = useState('');
@@ -27,7 +28,6 @@ export const ModalCrearClase = ({ setModalActual }) => {
     const periodoEscolar = `${periodo} ${anio}`;
 
     try {
-      // Inserción directa sin validaciones complejas de sesión para garantizar velocidad
       const { error: insertError } = await supabase
         .from('clase')
         .insert([{
@@ -41,9 +41,11 @@ export const ModalCrearClase = ({ setModalActual }) => {
 
       if (insertError) throw insertError;
 
-      // Cierra el modal y recarga la página para ver la clase reflejada de inmediato
+      // 2. Notificamos al sistema para que refresque la lista de clases en segundo plano
+      if (onActualizacion) onActualizacion();
+
+      // 3. Cerramos el modal limpiamente sin recargar la página entera
       setModalActual(null);
-      window.location.reload();
 
     } catch (err) {
       setError(err.message);
@@ -65,24 +67,42 @@ export const ModalCrearClase = ({ setModalActual }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Nombre de la clase:</label>
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Gestión de Proyectos" 
-                   className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
+            <input 
+              type="text" 
+              value={nombre} 
+              onChange={(e) => setNombre(e.target.value)} 
+              placeholder="Ej. Gestión de Proyectos" 
+              className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
+            />
           </div>
           <div>
             <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Clave:</label>
-            <input type="text" value={clave} onChange={(e) => setClave(e.target.value)} placeholder="Ej. GP-1" 
-                   className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
+            <input 
+              type="text" 
+              value={clave} 
+              onChange={(e) => setClave(e.target.value)} 
+              placeholder="Ej. GP-1" 
+              className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
+            />
           </div>
           <div>
             <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Grupo:</label>
-            <input type="text" value={grupo} onChange={(e) => setGrupo(e.target.value)} placeholder="Ej. 7A" 
-                   className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
+            <input 
+              type="text" 
+              value={grupo} 
+              onChange={(e) => setGrupo(e.target.value)} 
+              placeholder="Ej. 7A" 
+              className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
+            />
           </div>
           <div className="flex gap-4">
             <div className="w-2/3">
               <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Periodo:</label>
-              <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} 
-                      className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]">
+              <select 
+                value={periodo} 
+                onChange={(e) => setPeriodo(e.target.value)} 
+                className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
+              >
                 <option value="Enero-Junio">Enero-Junio</option>
                 <option value="Verano">Verano</option>
                 <option value="Agosto-Diciembre">Agosto-Diciembre</option>
@@ -90,12 +110,20 @@ export const ModalCrearClase = ({ setModalActual }) => {
             </div>
             <div className="w-1/3">
               <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Año:</label>
-              <input type="text" value={anio} onChange={(e) => setAnio(e.target.value)} maxLength="4"
-                     className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
+              <input 
+                type="text" 
+                value={anio} 
+                onChange={(e) => setAnio(e.target.value)} 
+                maxLength="4"
+                className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
+              />
             </div>
           </div>
-          <button type="submit" disabled={cargando}
-                  className={`${theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-4 rounded ${theme.font} disabled:opacity-50`}>
+          <button 
+            type="submit" 
+            disabled={cargando}
+            className={`${theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-4 rounded ${theme.font} disabled:opacity-50`}
+          >
             {cargando ? 'Guardando...' : 'Crear Clase'}
           </button>
         </form>

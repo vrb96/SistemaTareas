@@ -3,7 +3,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export default function PantallaPrincipal({ setVistaActual, setModalActual, setClaseSeleccionada }) {
+export default function PantallaPrincipal({ setVistaActual, setModalActual, setClaseSeleccionada, actualizador }) {
   const [clases, setClases] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -21,7 +21,7 @@ export default function PantallaPrincipal({ setVistaActual, setModalActual, setC
       setCargando(false);
     };
     cargarClases();
-  }, []);
+  }, [actualizador]);
 
   const handleEliminar = async (e, id_clase) => {
     e.stopPropagation();

@@ -18,9 +18,13 @@ export default function App() {
   const [modalActual, setModalActual] = useState(null);
   const [claseSeleccionada, setClaseSeleccionada] = useState(null);
   const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null);
-  const [rolTemporal, setRolTemporal] = useState('Profesor'); // 'Profesor' | 'Alumno' | 'Administrador'
   const [entregaSeleccionada, setEntregaSeleccionada] = useState(null);
+  const [entregasDeAsignacion, setEntregasDeAsignacion] = useState([]);
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
+  const [actualizador, setActualizador] = useState(0);
+
+  // Disparador de recarga de datos sin recargar el navegador
+  const forzarActualizacion = () => setActualizador((prev) => prev + 1);
 
   return (
     <div className={`${theme.bgSuperficie} min-h-screen relative`}>
@@ -43,33 +47,7 @@ export default function App() {
           setVistaActual={setVistaActual}
           setModalActual={setModalActual}
           setClaseSeleccionada={setClaseSeleccionada}
-        />
-      )}
-
-      {vistaActual === 'PantallaAsignaciones' && (
-        <PantallaAsignaciones
-          setVistaActual={setVistaActual}
-          setModalActual={setModalActual}
-          claseActual={claseSeleccionada}
-          setAsignacionSeleccionada={setAsignacionSeleccionada}
-        />
-      )}
-
-      {vistaActual === 'PantallaEntregas' && (
-        <PantallaEntregas
-          setVistaActual={setVistaActual}
-          setModalActual={setModalActual}
-          claseActual={claseSeleccionada}
-          asignacionActual={asignacionSeleccionada}
-        />
-      )}
-
-      {vistaActual === 'PantallaEntregas' && (
-        <PantallaEntregas
-          setVistaActual={setVistaActual}
-          setModalActual={setModalActual}
-          asignacionActual={asignacionSeleccionada}
-          setEntregaSeleccionada={setEntregaSeleccionada}
+          actualizador={actualizador}
         />
       )}
 
@@ -79,22 +57,44 @@ export default function App() {
           setModalActual={setModalActual}
           claseActual={claseSeleccionada}
           setAlumnoSeleccionado={setAlumnoSeleccionado}
+          actualizador={actualizador}
+        />
+      )}
+
+      {vistaActual === 'PantallaAsignaciones' && (
+        <PantallaAsignaciones
+          setVistaActual={setVistaActual}
+          setModalActual={setModalActual}
+          claseActual={claseSeleccionada}
+          setAsignacionSeleccionada={setAsignacionSeleccionada}
+          actualizador={actualizador}
+        />
+      )}
+
+      {vistaActual === 'PantallaEntregas' && (
+        <PantallaEntregas
+          setVistaActual={setVistaActual}
+          setModalActual={setModalActual}
+          asignacionActual={asignacionSeleccionada}
+          setEntregaSeleccionada={setEntregaSeleccionada}
+          setEntregasPadre={setEntregasDeAsignacion}
+          actualizador={actualizador}
         />
       )}
 
       {/* Ruteador de Modales */}
       {modalActual === 'CrearClase' && (
-        <ModalCrearClase setModalActual={setModalActual} />
-      )}
-
-      {modalActual === 'CrearClase' && (
-        <ModalCrearClase setModalActual={setModalActual} />
+        <ModalCrearClase
+          setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
+        />
       )}
 
       {modalActual === 'EditarClase' && (
         <ModalEditarClase
           claseAEditar={claseSeleccionada}
           setModalActual={setModalActual}
+          onClaseActualizada={forzarActualizacion}
         />
       )}
 
@@ -102,6 +102,7 @@ export default function App() {
         <ModalRegistrarAlumno
           idClase={claseSeleccionada?.id_clase}
           setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
         />
       )}
 
@@ -109,6 +110,7 @@ export default function App() {
         <ModalCargaMasiva
           idClase={claseSeleccionada?.id_clase}
           setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
         />
       )}
 
@@ -121,9 +123,9 @@ export default function App() {
           accion={modalActual}
           idAsignacion={asignacionSeleccionada?.id_asignacion}
           entregaActual={entregaSeleccionada}
-          todasLasEntregas={listaEntregasActuales}
+          todasLasEntregas={entregasDeAsignacion}
           setModalActual={setModalActual}
-          onActualizacion={() => cargarEntregas()}
+          onActualizacion={forzarActualizacion}
         />
       )}
 
@@ -133,7 +135,7 @@ export default function App() {
           alumnoItem={alumnoSeleccionado}
           idClase={claseSeleccionada?.id_clase}
           setModalActual={setModalActual}
-          onActualizacion={() => window.location.reload()}
+          onActualizacion={forzarActualizacion}
         />
       )}
 
@@ -143,6 +145,7 @@ export default function App() {
           idClase={claseSeleccionada?.id_clase}
           asignacionActual={asignacionSeleccionada}
           setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
         />
       )}
     </div>

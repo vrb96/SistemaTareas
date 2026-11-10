@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalActual }) => {
+export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalActual, onActualizacion }) => {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -30,21 +30,36 @@ export const ModalAsignacion = ({ accion, idClase, asignacionActual, setModalAct
           .update({ estado: 'Inactiva' })
           .eq('id_asignacion', asignacionActual.id_asignacion);
         if (dbError) throw dbError;
+
       } else if (accion === 'EditarAsignacion') {
         const { error: dbError } = await supabase
           .from('asignacion')
-          .update({ titulo: titulo.trim(), descripcion: descripcion.trim() })
+          .update({ 
+            titulo: titulo.trim(), 
+            descripcion: descripcion.trim() 
+          })
           .eq('id_asignacion', asignacionActual.id_asignacion);
         if (dbError) throw dbError;
+
       } else {
         if (!titulo.trim()) throw new Error('El título es obligatorio');
+        if (!idClase) throw new Error('No se detectó la clase seleccionada para asociar esta asignación');
+
         const { error: dbError } = await supabase
           .from('asignacion')
-          .insert([{ id_clase: idClase, titulo: titulo.trim(), descripcion: descripcion.trim(), estado: 'Activa' }]);
+          .insert([{ 
+            id_clase: idClase, 
+            titulo: titulo.trim(), 
+            descripcion: descripcion.trim(), 
+            estado: 'Activa' 
+          }]);
         if (dbError) throw dbError;
       }
 
+      // Notifica a App.jsx para cambiar el contador actualizador
+      if (onActualizacion) onActualizacion();
       setModalActual(null);
+
     } catch (err) {
       setError(err.message);
     } finally {
