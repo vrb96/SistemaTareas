@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import iconoEliminar from '../assets/eliminar.svg';
+import iconoEditar from '../assets/editar.svg';
 
 export default function PantallaPrincipal({ setVistaActual, setModalActual, setClaseSeleccionada, actualizador }) {
   const [clases, setClases] = useState([]);
@@ -23,27 +25,13 @@ export default function PantallaPrincipal({ setVistaActual, setModalActual, setC
     cargarClases();
   }, [actualizador]);
 
-  const handleEliminar = async (e, id_clase) => {
-    e.stopPropagation();
-    if (!window.confirm('¿Desea dar de baja esta clase?')) return;
-
-    const { error } = await supabase
-      .from('clase')
-      .update({ estado_activacion: false })
-      .eq('id_clase', id_clase);
-
-    if (!error) {
-      setClases(clases.filter(c => c.id_clase !== id_clase));
-    }
-  };
-
   return (
     <div className="p-8">
       <div className="flex justify-between items-center border-b-2 border-gray-300 pb-4 mb-8">
         <h1 className={`text-[28pt] font-bold ${theme.textSuperficie} ${theme.font}`}>Clases</h1>
         <button onClick={() => setModalActual('CrearClase')}
           className={`${theme.bgPrimario} ${theme.textPrimario} px-4 py-2 rounded flex items-center gap-2 text-[16pt] font-bold ${theme.font} hover:bg-blue-800 transition`}>
-          <Plus size={20} /> Agregar Clase
+          Agregar Clase
         </button>
       </div>
 
@@ -76,10 +64,17 @@ export default function PantallaPrincipal({ setVistaActual, setModalActual, setC
                   }}
                   className="hover:scale-110 transition text-blue-600"
                 >
-                  <Edit size={22} />
+                  <img src={iconoEditar} alt="Editar" className="w-[22px] h-[22px]" />
                 </button>
-                <button onClick={(e) => handleEliminar(e, clase.id_clase)} className="text-[#465d91] hover:text-red-600">
-                  <Trash2 size={22} />
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setClaseSeleccionada(clase);
+                    setModalActual('EliminarClase');
+                  }} 
+                  className="hover:scale-110 transition text-[#465d91] hover:text-red-600"
+                >
+                  <img src={iconoEliminar} alt="Dar de baja" className="w-[22px] h-[22px]" />
                 </button>
               </div>
             </div>

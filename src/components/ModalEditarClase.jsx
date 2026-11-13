@@ -9,8 +9,10 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
   const [grupo, setGrupo] = useState('');
   const [periodo, setPeriodo] = useState('Enero-Junio');
   const [anio, setAnio] = useState(new Date().getFullYear().toString());
+  
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const [exito, setExito] = useState(false); // Estado para el mensaje de éxito
 
   useEffect(() => {
     if (claseAEditar) {
@@ -33,15 +35,44 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
     setError('');
     setCargando(true);
 
+    // 1. Validaciones de longitud (CP-0004)[cite: 16]
     if (!nombre.trim() || !clave.trim() || !grupo.trim() || !anio.trim()) {
       setError('Faltan datos obligatorios');
       setCargando(false);
       return;
     }
+    if (nombre.trim().length < 3 || nombre.trim().length > 100) {
+      setError('El nombre debe tener entre 3 y 100 caracteres');
+      setCargando(false);
+      return;
+    }
+    if (!/^\d{4}$/.test(anio.trim()) || parseInt(anio.trim()) < 0) {
+      setError('El año escolar debe ser un número positivo de 4 dígitos');
+      setCargando(false);
+      return;
+    }
 
-    const periodoEscolar = `${periodo} ${anio}`;
+    const periodoEscolar = `${periodo} ${anio.trim()}`;
 
     try {
+      // 2. Validación de duplicidad excluyendo la clase actual (CP-0004)[cite: 16]
+      const { data: clasesDuplicadas, error: searchError } = await supabase
+        .from('clase')
+        .select('id_clase')
+        .eq('uid_profesor', claseAEditar.uid_profesor)
+        .eq('clave', clave.trim())
+        .eq('grupo', grupo.trim())
+        .eq('periodo_escolar', periodoEscolar)
+        .eq('estado_activacion', true)
+        .neq('id_clase', claseAEditar.id_clase); // No contar la clase que estamos editando
+
+      if (searchError) throw searchError;
+
+      if (clasesDuplicadas && clasesDuplicadas.length > 0) {
+        throw new Error('Ya tienes otra clase registrada con esta misma clave, grupo y periodo');
+      }
+
+      // 3. Actualización de los datos
       const { error: updateError } = await supabase
         .from('clase')
         .update({
@@ -54,11 +85,12 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
 
       if (updateError) throw updateError;
 
-      // Se notifica la actualización y se cierra sin recargar toda la ventana
-      if (onClaseActualizada) {
-        onClaseActualizada();
-      }
-      setModalActual(null);
+      // 4. Mostrar mensaje de confirmación y cerrar[cite: 16]
+      setExito(true);
+      setTimeout(() => {
+        if (onClaseActualizada) onClaseActualizada();
+        setModalActual(null);
+      }, 2000);
 
     } catch (err) {
       setError(err.message);
@@ -80,7 +112,22 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
           Editar Clase
         </h2>
 
-        {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{error}</div>}
+        {/* Mensaje de error (CP-0002) */}
+        {error && (
+          <div className={`mb-4 p-4 rounded text-center flex flex-col items-center gap-3 ${theme.bgError} ${theme.textError}`}>
+            <span className="font-bold text-[14pt]">{error}</span>
+            <button 
+              type="button"
+              onClick={() => setError('')} 
+              className="bg-[#93000a] text-white px-6 py-2 rounded font-bold hover:bg-red-800 transition"
+            >
+              Aceptar
+            </button>
+          </div>
+        )}
+        
+        {/* Mensaje de éxito requerido por el reporte (CP-0004)[cite: 16] */}
+        {exito && <div className="mb-4 p-3 rounded text-center font-bold bg-green-200 text-green-800">Clase actualizada con éxito</div>}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
@@ -134,13 +181,25 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
               />
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={cargando}
-            className={`${theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-4 rounded ${theme.font} disabled:opacity-50`}
-          >
-            {cargando ? 'Guardando cambios...' : 'Actualizar Clase'}
-          </button>
+          
+          <div className="flex justify-center gap-6 mt-4">
+             {/* Se agregó el botón Cancelar requerido en FA_02 del C.U.1[cite: 16] */}
+             <button 
+                type="button"
+                onClick={() => setModalActual(null)}
+                disabled={cargando || exito}
+                className="bg-gray-400 text-white text-[16pt] font-bold py-2 px-6 rounded hover:bg-gray-600 transition disabled:opacity-50"
+             >
+                Cancelar
+             </button>
+             <button
+                type="submit"
+                disabled={cargando || exito}
+                className={`${theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-2 px-6 rounded ${theme.font} disabled:opacity-50`}
+             >
+                {cargando ? 'Guardando...' : 'Guardar cambios'}
+             </button>
+          </div>
         </form>
       </div>
     </div>

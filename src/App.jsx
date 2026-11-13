@@ -11,6 +11,7 @@ import { ModalCargaMasiva, ModalDescargaCredenciales } from './components/ModalC
 import { ModalAsignacion } from './components/ModalAsignacion';
 import { ModalEntrega } from './components/ModalEntrega';
 import { ModalEditarClase } from './components/ModalEditarClase';
+import { ModalEliminarClase } from './components/ModalEliminarClase';
 import { ModalGestionAlumno } from './components/ModalGestionAlumno';
 
 export default function App() {
@@ -95,6 +96,14 @@ export default function App() {
           claseAEditar={claseSeleccionada}
           setModalActual={setModalActual}
           onClaseActualizada={forzarActualizacion}
+        />
+      )}
+
+      {modalActual === 'EliminarClase' && (
+        <ModalEliminarClase
+          claseSeleccionada={claseSeleccionada}
+          setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
         />
       )}
 
