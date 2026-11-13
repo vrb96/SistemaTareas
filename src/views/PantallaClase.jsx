@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, UserCheck } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import iconoEliminar from '../assets/eliminar.svg';
+import iconoEditar from '../assets/editar.svg';
 
 export default function PantallaClase({ setVistaActual, setModalActual, claseActual, setAlumnoSeleccionado, actualizador }) {
   const [alumnos, setAlumnos] = useState([]);
@@ -156,7 +158,7 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
                         className="text-blue-600 hover:text-blue-900 transition"
                         title="Editar Alumno"
                       >
-                        <Edit size={22}/>
+                        <img src={iconoEditar} alt="Editar" className="w-[22px] h-[22px]" />
                       </button>
 
                       {item.estado_inscripcion === 'Activa' ? (
@@ -165,7 +167,7 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
                           className="text-red-600 hover:text-red-800 transition"
                           title="Dar de baja"
                         >
-                          <Trash2 size={22}/>
+                          <img src={iconoEliminar} alt="Dar de baja" className="w-[22px] h-[22px]" />
                         </button>
                       ) : (
                         <button

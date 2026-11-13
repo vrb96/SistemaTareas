@@ -12,6 +12,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
   const [correo, setCorreo] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const [exito, setExito] = useState(false);
 
   const esEditar = accion === 'EditarAlumno';
   const esEliminar = accion === 'EliminarAlumno';
@@ -68,19 +69,30 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
         if (dbError) throw dbError;
       }
 
-      setModalActual(null);
-      if (onActualizacion) onActualizacion();
+      // Mostrar mensaje de confirmación antes de cerrar (CP-0005)[cite: 14]
+      setExito(true);
+      setTimeout(() => {
+          if (onActualizacion) onActualizacion();
+          setModalActual(null);
+      }, 2000);
+
     } catch (err) {
       setError(err.message);
-    } finally {
       setCargando(false);
     }
   };
 
   const getTitulo = () => {
-    if (esEliminar) return '¿Desea Dar de Baja al siguiente Alumno?';
+    // Texto exacto requerido por el documento[cite: 14]
+    if (esEliminar) return '¿Desea dar de Baja la inscripción del alumno en esta clase?';
     if (esReactivar) return '¿Desea Reactivar al siguiente Alumno?';
     return 'Editar Alumno';
+  };
+
+  const getMensajeExito = () => {
+      if (esEliminar) return 'Inscripción dada de baja con éxito';
+      if (esReactivar) return 'Alumno reactivado con éxito';
+      return 'Alumno actualizado con éxito';
   };
 
   const getColorBoton = () => {
@@ -99,11 +111,13 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
           <X size={24} />
         </button>
 
-        <h2 className={`text-[20pt] font-bold mb-6 text-center ${esEliminar ? 'text-red-600' : theme.textContenedor} ${theme.font}`}>
+        <h2 className={`text-[16pt] font-bold mb-6 text-center ${esEliminar ? 'text-red-600' : theme.textContenedor} ${theme.font}`}>
           {getTitulo()}
         </h2>
 
         {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-center">{error}</div>}
+        {/* Mensaje de confirmación visual */}
+        {exito && <div className="bg-green-200 text-green-800 font-bold p-3 rounded mb-4 text-center">{getMensajeExito()}</div>}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div>
@@ -127,26 +141,27 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
             />
           </div>
 
-          <div>
-            <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Paterno:</label>
-            <input
-              type="text"
-              value={apPaterno}
-              onChange={(e) => setApPaterno(e.target.value)}
-              disabled={!esEditar}
-              className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
-            />
-          </div>
-
-          <div>
-            <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Materno:</label>
-            <input
-              type="text"
-              value={apMaterno}
-              onChange={(e) => setApMaterno(e.target.value)}
-              disabled={!esEditar}
-              className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
-            />
+          <div className="flex gap-2">
+              <div className="w-1/2">
+                <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Paterno:</label>
+                <input
+                type="text"
+                value={apPaterno}
+                onChange={(e) => setApPaterno(e.target.value)}
+                disabled={!esEditar}
+                className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
+                />
+              </div>
+              <div className="w-1/2">
+                <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Materno:</label>
+                <input
+                type="text"
+                value={apMaterno}
+                onChange={(e) => setApMaterno(e.target.value)}
+                disabled={!esEditar}
+                className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
+                />
+              </div>
           </div>
 
           <div>
@@ -160,13 +175,24 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={cargando}
-            className={`${getColorBoton()} ${theme.textPrimario} text-[15pt] font-bold py-2.5 mt-3 rounded ${theme.font} transition disabled:opacity-50`}
-          >
-            {cargando ? 'Procesando...' : (esEliminar ? 'Dar de Baja' : esReactivar ? 'Reactivar Alumno' : 'Guardar Cambios')}
-          </button>
+          <div className="flex justify-center gap-4 mt-4">
+             {/* Botón Cancelar requerido por C.U.3 FA_02[cite: 14] */}
+             <button 
+                type="button"
+                onClick={() => setModalActual(null)}
+                disabled={cargando || exito}
+                className="bg-gray-400 text-white text-[15pt] font-bold py-2 px-6 rounded hover:bg-gray-600 transition disabled:opacity-50"
+             >
+                Cancelar
+             </button>
+             <button
+                type="submit"
+                disabled={cargando || exito}
+                className={`${getColorBoton()} ${theme.textPrimario} text-[15pt] font-bold py-2 px-6 rounded ${theme.font} transition disabled:opacity-50`}
+             >
+                {cargando ? 'Procesando...' : (esEliminar ? 'Dar de Baja' : esReactivar ? 'Reactivar Alumno' : 'Guardar Cambios')}
+             </button>
+          </div>
         </form>
       </div>
     </div>
