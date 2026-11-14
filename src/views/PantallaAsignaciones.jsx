@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Plus } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import iconoEliminar from '../assets/eliminar.svg';
+import iconoEditar from '../assets/editar.svg';
 
 export default function PantallaAsignaciones({ setVistaActual, setModalActual, claseActual, setAsignacionSeleccionada, actualizador }) {
   const [asignaciones, setAsignaciones] = useState([]);
@@ -11,9 +13,10 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
     if (!claseActual?.id_clase) return;
     setCargando(true);
 
+    // Se agregaron hora_limite y estado_cierre a la consulta para el cálculo exacto
     const { data, error } = await supabase
       .from('asignacion')
-      .select('*, entrega(id_entrega, fecha_limite)')
+      .select('*, entrega(id_entrega, fecha_limite, hora_limite, estado_cierre)')
       .eq('id_clase', claseActual.id_clase)
       .eq('estado', 'Activa')
       .order('fecha_creacion', { ascending: false });
@@ -38,10 +41,25 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
     setVistaActual('PantallaEntregas');
   };
 
-  const formatearFecha = (fechaISO) => {
+  // Función segura para calcular la hora exacta en México sin bugs de zona horaria
+  const esEntregaAbierta = (entrega) => {
+    if (entrega.estado_cierre) return false;
+    if (!entrega.fecha_limite) return true;
+
+    const [year, month, day] = entrega.fecha_limite.split('-');
+    const [hour, minute] = (entrega.hora_limite || '23:59').split(':');
+    const fechaHoraLimite = new Date(year, month - 1, day, hour, minute);
+    
+    return new Date() <= fechaHoraLimite;
+  };
+
+  const formatearFecha = (fechaISO, horaIso) => {
     if (!fechaISO) return '';
-    const opciones = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' };
-    return new Date(fechaISO).toLocaleString('es-MX', opciones);
+    const [year, month, day] = fechaISO.split('-');
+    const [hour, minute] = (horaIso || '23:59').split(':');
+    const fecha = new Date(year, month - 1, day, hour, minute);
+    
+    return fecha.toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -79,15 +97,21 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {asignaciones.map((tarea) => {
               
-              const ahora = new Date();
               const totalEntregas = tarea.entrega ? tarea.entrega.length : 0;
               
-              // Filtrar entregas abiertas y ordenarlas por la fecha límite más cercana
-              const entregasAbiertas = tarea.entrega ? tarea.entrega.filter(e => e.fecha_limite && new Date(e.fecha_limite) > ahora).sort((a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite)) : [];
+              // Usamos la nueva función segura
+              const entregasAbiertas = (tarea.entrega || []).filter(esEntregaAbierta);
+
+              // Ordenamos para mostrar la más próxima a vencer
+              entregasAbiertas.sort((a, b) => {
+                  const dateA = new Date(`${a.fecha_limite}T${a.hora_limite || '23:59'}`);
+                  const dateB = new Date(`${b.fecha_limite}T${b.hora_limite || '23:59'}`);
+                  return dateA - dateB;
+              });
 
               let textoEntrega = 'Sin entregas abiertas';
               if (entregasAbiertas.length > 0) {
-                 textoEntrega = `Próxima: ${formatearFecha(entregasAbiertas[0].fecha_limite)}`;
+                 textoEntrega = `Próxima: ${formatearFecha(entregasAbiertas[0].fecha_limite, entregasAbiertas[0].hora_limite)}`;
               }
 
               return (
@@ -108,10 +132,10 @@ export default function PantallaAsignaciones({ setVistaActual, setModalActual, c
 
                   <div className="absolute bottom-2 right-2 flex gap-3">
                     <button onClick={(e) => { e.stopPropagation(); abrirModal('EditarAsignacion', tarea); }} className="hover:text-blue-300 transition" title="Editar">
-                      <Edit size={20} />
+                      <img src={iconoEditar} alt="Editar" className="w-[22px] h-[22px]" style={{ filter: 'invert(100%)' }} />
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); abrirModal('EliminarAsignacion', tarea); }} className="hover:text-red-300 transition" title="Eliminar">
-                      <Trash2 size={20} />
+                      <img src={iconoEliminar} alt="Dar de baja" className="w-[22px] h-[22px]" style={{ filter: 'invert(100%)' }} />
                     </button>
                   </div>
                 </div>
