@@ -17,13 +17,15 @@ export const ModalEntrega = ({
   const [horaCierre, setHoraCierre] = useState('23:59');
   const [instrucciones, setInstrucciones] = useState('');
   const [cargando, setCargando] = useState(false);
+  
   const [error, setError] = useState('');
+  const [exito, setExito] = useState(''); // Estado para mensajes de confirmación
 
   const esCrear = accion === 'CrearEntrega';
   const esEditar = accion === 'EditarEntrega';
   const esEliminar = accion === 'EliminarEntrega';
 
-  // RF017: Número consecutivo automático (Entrega 1, Entrega 2, etc.)
+  // RF017: Número consecutivo automático
   const siguienteConsecutivo = `Entrega ${todasLasEntregas.length + 1}`;
 
   useEffect(() => {
@@ -45,12 +47,10 @@ export const ModalEntrega = ({
       throw new Error('Ingrese una fecha y hora límite válidas.');
     }
 
-    // Regla: Posterior al momento actual
     if (fechaHoraIngresada <= ahora) {
       throw new Error('La fecha y hora límite deben ser posteriores al momento actual.');
     }
 
-    // Validación de Fecha de Cierre (debe ser >= Fecha Límite de Entrega)
     const cierreFinalFecha = fechaCierre || fechaLimite;
     const cierreFinalHora = horaCierre || horaLimite;
     const fechaHoraCierreObj = new Date(`${cierreFinalFecha}T${cierreFinalHora}:00`);
@@ -60,18 +60,16 @@ export const ModalEntrega = ({
     }
 
     if (esCrear) {
-      // Regla RF017: Posterior a la última entrega existente
       if (todasLasEntregas.length > 0) {
         const ultima = todasLasEntregas[todasLasEntregas.length - 1];
         const fechaHoraUltima = new Date(`${ultima.fecha_limite}T${ultima.hora_limite}`);
         if (fechaHoraIngresada <= fechaHoraUltima) {
-          throw new Error(`La fecha y hora deben ser posteriores a la de la entrega anterior (${ultima.numero_entrega}).`);
+          throw new Error(`La fecha y hora límite debe ser posterior a la de la entrega anterior (${ultima.numero_entrega}).`);
         }
       }
     }
 
     if (esEditar) {
-      // Regla RF018: Posterior a la anterior y anterior a la siguiente
       const indice = todasLasEntregas.findIndex(e => e.id_entrega === entregaActual.id_entrega);
 
       if (indice > 0) {
@@ -99,13 +97,11 @@ export const ModalEntrega = ({
 
     try {
       if (esEliminar) {
-        // Regla RF019: Solo se puede eliminar la ÚLTIMA entrega
         const ultimaEntrega = todasLasEntregas[todasLasEntregas.length - 1];
         if (ultimaEntrega && ultimaEntrega.id_entrega !== entregaActual.id_entrega) {
           throw new Error('Solo se puede eliminar la última entrega registrada de la asignación.');
         }
 
-        // Regla RF019: Verificar si tiene envíos
         const { count, error: countError } = await supabase
           .from('envio')
           .select('*', { count: 'exact', head: true })
@@ -121,15 +117,14 @@ export const ModalEntrega = ({
           .eq('id_entrega', entregaActual.id_entrega);
 
         if (dbError) throw dbError;
+        setExito('Entrega eliminada con éxito');
 
       } else if (esEditar) {
         validarFechas();
 
-        // Si el profesor deja vacío el cierre, se asume igual a la fecha límite
         const fechaCierreFinal = fechaCierre || fechaLimite;
         const horaCierreFinal = horaCierre || horaLimite;
 
-        // RF018: Si la nueva fecha es futura y estaba cerrada, vuelve a estar abierta
         const { error: dbError } = await supabase
           .from('entrega')
           .update({
@@ -143,6 +138,7 @@ export const ModalEntrega = ({
           .eq('id_entrega', entregaActual.id_entrega);
 
         if (dbError) throw dbError;
+        setExito('Entrega actualizada con éxito. La entrega se encuentra Abierta');
 
       } else if (esCrear) {
         validarFechas();
@@ -150,7 +146,6 @@ export const ModalEntrega = ({
         const fechaCierreFinal = fechaCierre || fechaLimite;
         const horaCierreFinal = horaCierre || horaLimite;
 
-        // RF017: Guardado con consecutivo automático y estado_cierre false
         const { error: dbError } = await supabase
           .from('entrega')
           .insert([{
@@ -165,13 +160,17 @@ export const ModalEntrega = ({
           }]);
 
         if (dbError) throw dbError;
+        setExito('Entrega creada con éxito'); // CP-0009[cite: 23]
       }
 
-      setModalActual(null);
-      if (onActualizacion) onActualizacion();
+      // Demora para permitir que el usuario lea el mensaje de éxito
+      setTimeout(() => {
+        setModalActual(null);
+        if (onActualizacion) onActualizacion();
+      }, 2000);
+
     } catch (err) {
       setError(err.message);
-    } finally {
       setCargando(false);
     }
   };
@@ -194,11 +193,22 @@ export const ModalEntrega = ({
               : `Crear ${siguienteConsecutivo}`}
         </h2>
 
+        {/* Botón Aceptar requerido para Errores CP-0009[cite: 23] */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4 text-[13pt] text-center">
-            {error}
+          <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4 flex flex-col items-center gap-3 text-center">
+            <span className="font-bold text-[13pt]">{error}</span>
+            <button
+              type="button"
+              onClick={() => setError('')}
+              className="bg-red-700 text-white px-8 py-1.5 rounded font-bold hover:bg-red-800 transition"
+            >
+              Aceptar
+            </button>
           </div>
         )}
+
+        {/* Mensaje de confirmación visual CP-0009[cite: 23] */}
+        {exito && <div className="bg-green-200 text-green-800 p-3 rounded mb-4 text-center font-bold">{exito}</div>}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {esEliminar ? (
@@ -221,6 +231,7 @@ export const ModalEntrega = ({
                       type="date"
                       required
                       value={fechaLimite}
+                      disabled={exito}
                       onChange={(e) => {
                         setFechaLimite(e.target.value);
                         if (!fechaCierre) setFechaCierre(e.target.value);
@@ -236,6 +247,7 @@ export const ModalEntrega = ({
                       type="time"
                       required
                       value={horaLimite}
+                      disabled={exito}
                       onChange={(e) => setHoraLimite(e.target.value)}
                       className="w-full p-2 border border-gray-400 rounded bg-white text-[14pt]"
                     />
@@ -256,6 +268,7 @@ export const ModalEntrega = ({
                     <input
                       type="date"
                       value={fechaCierre}
+                      disabled={exito}
                       onChange={(e) => setFechaCierre(e.target.value)}
                       placeholder={fechaLimite}
                       className="w-full p-2 border border-blue-300 rounded bg-white text-[14pt]"
@@ -268,6 +281,7 @@ export const ModalEntrega = ({
                     <input
                       type="time"
                       value={horaCierre}
+                      disabled={exito}
                       onChange={(e) => setHoraCierre(e.target.value)}
                       className="w-full p-2 border border-blue-300 rounded bg-white text-[14pt]"
                     />
@@ -288,6 +302,7 @@ export const ModalEntrega = ({
                 <textarea
                   value={instrucciones}
                   maxLength={1000}
+                  disabled={exito}
                   onChange={(e) => setInstrucciones(e.target.value)}
                   rows="3"
                   className="w-full p-2 border border-gray-400 rounded bg-white text-[13pt]"
@@ -297,13 +312,24 @@ export const ModalEntrega = ({
             </>
           )}
 
-          <button
-            type="submit"
-            disabled={cargando}
-            className={`${esEliminar ? theme.bgError : theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-3 mt-2 rounded ${theme.font} transition disabled:opacity-50`}
-          >
-            {cargando ? 'Procesando...' : (esEliminar ? 'Confirmar Eliminación' : 'Guardar Entrega')}
-          </button>
+          <div className="flex gap-4 mt-2">
+            {/* Botón Cancelar requerido por CP-0009[cite: 23] */}
+            <button
+              type="button"
+              onClick={() => setModalActual(null)}
+              disabled={cargando || exito}
+              className="w-1/2 bg-gray-400 text-white text-[16pt] font-bold py-2.5 rounded hover:bg-gray-600 transition disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={cargando || exito}
+              className={`w-1/2 ${esEliminar ? theme.bgError : theme.bgPrimario} ${theme.textPrimario} text-[16pt] font-bold py-2.5 rounded ${theme.font} transition disabled:opacity-50`}
+            >
+              {cargando ? 'Procesando...' : (esEliminar ? 'Confirmar Eliminación' : 'Guardar Entrega')}
+            </button>
+          </div>
         </form>
       </div>
     </div>
