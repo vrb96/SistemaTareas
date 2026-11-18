@@ -1,30 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit, Trash2, Plus } from 'lucide-react';
+import { X, Edit, Trash2, ChevronLeft } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
-import iconoEliminar from '../assets/eliminar.svg';
-import iconoEditar from '../assets/editar.svg';
 
-export default function PantallaEntregas({ 
-  setVistaActual, 
-  setModalActual, 
-  asignacionActual, 
+export default function PantallaEntregas({
+  setVistaActual,
+  setModalActual,
+  asignacionActual,
   setEntregaSeleccionada,
   setEntregasPadre,
-  actualizador 
+  actualizador
 }) {
   const [entregas, setEntregas] = useState([]);
   const [cargando, setCargando] = useState(true);
 
   const cargarEntregas = async () => {
-    if (!asignacionActual?.id_asignacion) return;
-    setCargando(true);
+    if (!asignacionActual?.id_asignacion) {
+      setCargando(false);
+      return;
+    }
 
+    setCargando(true);
     const { data, error } = await supabase
       .from('entrega')
       .select('*')
       .eq('id_asignacion', asignacionActual.id_asignacion)
-      .order('fecha_limite', { ascending: true });
+      .order('id_entrega', { ascending: true });
 
     if (!error && data) {
       setEntregas(data);
@@ -42,49 +43,52 @@ export default function PantallaEntregas({
     setModalActual(accion);
   };
 
-  // RF020: Cálculo exacto de hora local para cierre automático
+  // RF020: Verificar si la entrega ya pasó su fecha/hora límite o de cierre
   const estaCerrada = (entrega) => {
     if (entrega.estado_cierre) return true;
-    
-    const fechaCorte = entrega.fecha_limite;
-    const horaCorte = entrega.hora_limite || '23:59';
-    
+    const fechaCorte = entrega.fecha_cierre || entrega.fecha_limite;
+    const horaCorte = entrega.hora_cierre || entrega.hora_limite || '23:59:00';
     if (!fechaCorte) return false;
-
-    // Separamos explícitamente para evitar saltos de zona horaria (UTC)
-    const [year, month, day] = fechaCorte.split('-');
-    const [hour, minute] = horaCorte.split(':');
-    
-    // Meses en JS empiezan en 0 (enero = 0)
-    const fechaHoraLimite = new Date(year, month - 1, day, hour, minute);
-    
+    const fechaHoraLimite = new Date(`${fechaCorte}T${horaCorte}`);
     return new Date() > fechaHoraLimite;
   };
 
   return (
     <div className="flex h-[calc(100vh-73px)]">
+      {/* Barra Lateral */}
       <div className="w-1/5 border-r-2 border-gray-300 p-4 flex flex-col gap-4 bg-white">
-        <button 
-          onClick={() => setVistaActual('PantallaAsignaciones')} 
+        <button
+          onClick={() => setVistaActual('PantallaAsignaciones')}
           className="text-xl font-bold mb-4 text-left hover:text-red-500"
         >
           <X size={30} />
         </button>
-        <button className={`${theme.bgPrimario} ${theme.textPrimario} py-2 rounded text-[16pt] font-bold text-center ${theme.font}`}>
+        <button
+          className={`${theme.bgPrimario} ${theme.textPrimario} py-2 rounded text-[16pt] font-bold text-center ${theme.font}`}
+        >
           Entregas
         </button>
       </div>
 
+      {/* Área Principal */}
       <div className="w-4/5 p-8 overflow-y-auto">
-        <div className="flex justify-between items-center mb-8 border-b-2 border-gray-300 pb-4 relative">
-          <h1 className={`text-[28pt] font-bold text-center w-full ${theme.textSuperficie} ${theme.font}`}>
-            {asignacionActual?.titulo || 'Asignación'}
+        <div className="relative flex justify-between items-center mb-8 border-b-2 border-gray-300 pb-4">
+          <button
+            onClick={() => setVistaActual('PantallaAsignaciones')}
+            className="flex items-center gap-1 text-[#465d91] font-bold text-[16pt] hover:text-[#2e4578]"
+          >
+            <ChevronLeft size={24} /> Volver
+          </button>
+
+          <h1 className={`text-[28pt] font-bold text-center ${theme.textSuperficie} ${theme.font}`}>
+            {asignacionActual?.titulo || 'Título de la Asignación'}
           </h1>
+
           <button
             onClick={() => abrirModal('CrearEntrega')}
-            className={`${theme.bgPrimario} ${theme.textPrimario} px-4 py-2 rounded font-bold text-[16pt] absolute right-0 hover:bg-blue-800 transition flex items-center gap-2 ${theme.font}`}
+            className={`${theme.bgPrimario} ${theme.textPrimario} px-4 py-2 rounded font-bold text-[16pt] hover:bg-blue-800 ${theme.font}`}
           >
-            <Plus size={22} /> Crear Entrega
+            Crear Entrega
           </button>
         </div>
 
@@ -97,40 +101,47 @@ export default function PantallaEntregas({
         ) : (
           <div className="flex flex-col gap-4">
             {entregas.map((entrega, index) => {
-              const esUltima = index === entregas.length - 1;
               const cerrada = estaCerrada(entrega);
+              const esUltima = index === entregas.length - 1;
 
               return (
                 <div
                   key={entrega.id_entrega}
-                  className={`${theme.bgPrimario} text-white p-5 rounded-lg flex justify-between items-center shadow`}
+                  onClick={() => {
+                    if (setEntregaSeleccionada) setEntregaSeleccionada(entrega);
+                    setVistaActual('PantallaEnviosEntrega');
+                  }}
+                  className={`${theme.bgPrimario} text-white p-5 rounded-lg flex justify-between items-center shadow cursor-pointer hover:bg-[#2e4578] transition`}
                 >
+                  {/* Columna Izquierda: Número, Estado e Instrucciones */}
                   <div className="w-1/3">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[17pt] font-bold block ${theme.font}`}>
-                        {entrega.numero_entrega}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[16pt] font-bold block ${theme.font}`}>
+                        {entrega.numero_entrega || `Entrega ${entrega.no_entrega || index + 1}`}
                       </span>
-                      <span className={`text-[10pt] px-2.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                        cerrada ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-                      }`}>
+                      <span
+                        className={`text-[10pt] px-2 py-0.5 rounded font-bold uppercase ${
+                          cerrada ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+                        }`}
+                      >
                         {cerrada ? 'Cerrada' : 'Abierta'}
                       </span>
                     </div>
-                    <span className="text-[12pt] text-blue-200 block mt-1 line-clamp-2">
+                    <span className="text-[12pt] text-blue-200 block mt-1">
                       {entrega.instrucciones || 'Sin instrucciones adicionales'}
                     </span>
                   </div>
 
+                  {/* Columna Central: Fechas Límite y Cierre */}
                   <div className="text-center w-1/3">
                     <div className="mb-1">
-                      <span className="text-[10pt] text-blue-200 block uppercase tracking-wider">
+                      <span className="text-[11pt] text-blue-200 block uppercase tracking-wider">
                         Límite Alumno
                       </span>
                       <span className={`text-[15pt] font-semibold ${theme.font}`}>
                         {entrega.fecha_limite} — {entrega.hora_limite?.slice(0, 5)} hrs
                       </span>
                     </div>
-
                     {entrega.fecha_cierre && (
                       <div>
                         <span className="text-[10pt] text-yellow-300 block uppercase tracking-wider font-bold">
@@ -143,31 +154,40 @@ export default function PantallaEntregas({
                     )}
                   </div>
 
+                  {/* Columna Derecha: Botones Editar / Eliminar */}
                   <div className="flex items-center gap-6">
                     <div className="flex gap-4">
-                      <button 
-                        onClick={() => abrirModal('EditarEntrega', entrega)} 
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirModal('EditarEntrega', entrega);
+                        }}
                         className="hover:text-blue-300 transition"
                         title="Editar entrega"
                       >
-                        <img src={iconoEditar} alt="Editar" className="w-[22px] h-[22px]" style={{ filter: 'invert(100%)' }} />
+                        <Edit size={24} />
                       </button>
 
+                      {/* RF019: Solo habilitado para la última entrega */}
                       {esUltima ? (
-                        <button 
-                          onClick={() => abrirModal('EliminarEntrega', entrega)} 
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            abrirModal('EliminarEntrega', entrega);
+                          }}
                           className="hover:text-red-300 transition"
-                          title="Eliminar entrega (última fase registrada)"
+                          title="Eliminar entrega"
                         >
-                          <img src={iconoEliminar} alt="Dar de baja" className="w-[22px] h-[22px]" style={{ filter: 'invert(100%)' }} />
+                          <Trash2 size={24} />
                         </button>
                       ) : (
-                        <button 
+                        <button
                           disabled
+                          onClick={(e) => e.stopPropagation()}
                           className="opacity-30 cursor-not-allowed text-gray-300"
                           title="Solo se puede eliminar la última entrega registrada"
                         >
-                          <img src={iconoEliminar} alt="Dar de baja" className="w-[22px] h-[22px]" style={{ filter: 'invert(100%)' }} />
+                          <Trash2 size={24} />
                         </button>
                       )}
                     </div>

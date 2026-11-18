@@ -62,7 +62,7 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
     <div className="flex h-[calc(100vh-73px)]">
       <div className="w-1/5 border-r-2 border-gray-300 p-4 flex flex-col gap-4 bg-white">
         <button onClick={() => setVistaActual('PantallaPrincipal')} className="text-xl font-bold mb-4 text-left hover:text-red-500">
-          <X size={30}/>
+          <X size={30} />
         </button>
         <button className={`${theme.bgPrimario} ${theme.textPrimario} py-2 rounded text-[16pt] font-bold text-center ${theme.font}`}>
           Alumno
@@ -72,6 +72,12 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
           className={`bg-gray-400 text-white py-2 rounded text-[16pt] font-bold text-center hover:bg-[#465d91] transition ${theme.font}`}
         >
           Asignaciones
+        </button>
+        <button
+          onClick={() => setVistaActual('PantallaEquipos')}
+          className={`${theme.bgContenedor} ${theme.textContenedor} py-2 rounded text-[16pt] font-bold text-center hover:bg-blue-200 ${theme.font}`}
+        >
+          Equipos
         </button>
       </div>
 
@@ -175,7 +181,7 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
                           className="text-green-600 hover:text-green-800 transition"
                           title="Reactivar Alumno"
                         >
-                          <UserCheck size={22}/>
+                          <UserCheck size={22} />
                         </button>
                       )}
                     </div>
