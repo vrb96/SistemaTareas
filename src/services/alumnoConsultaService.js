@@ -56,32 +56,56 @@ export async function obtenerClasesAlumno(noControl) {
 export async function obtenerAsignacionesClase(idClase) {
   const { data, error } = await supabase
     .from('asignacion')
-    .select('id_asignacion, titulo, descripcion, estado_equipo')
+    .select('*')
     .eq('id_clase', idClase)
-    .eq('estado', 'Activa')
     .order('fecha_creacion', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+
+  // Filtrar solo las activas (soporta tanto boolean estado_activacion como texto estado = 'Activa')
+  return (data || [])
+    .filter((a) => {
+      if (a.estado_activacion !== undefined && a.estado_activacion !== null) {
+        return Boolean(a.estado_activacion);
+      }
+      if (a.estado !== undefined && a.estado !== null) {
+        return a.estado === 'Activa' || a.estado === true;
+      }
+      return true;
+    })
+    .map((a) => ({
+      ...a,
+      titulo: a.titulo || a.nombre || 'Asignación sin título',
+      estado_equipo: a.estado_equipo ?? a.es_equipo ?? false
+    }));
 }
 
 // 3. Obtener entregas, estado de envío, calificación y comentarios del alumno (C.U.9 Pasos 3-4)
+// 3. Obtener entregas, estado de envío, prórrogas, calificación y comentarios del alumno
 export async function obtenerEntregasAlumno(idAsignacion, noControl) {
   const { data: entregas, error: errEnt } = await supabase
     .from('entrega')
-    .select('id_entrega, no_entrega, numero_entrega, instrucciones, fecha_limite, hora_limite, estado_cierre')
+    .select('*')
     .eq('id_asignacion', idAsignacion)
-    .order('id_entrega', { ascending: true });
+    .order('fecha_limite', { ascending: true })
+    .order('hora_limite', { ascending: true });
 
   if (errEnt) throw errEnt;
   if (!entregas || entregas.length === 0) return [];
 
   const idsEntregas = entregas.map((e) => e.id_entrega);
 
-  // Consultar envíos del alumno en esas entregas (si la tabla envio ya existe)
+  // Consultar envíos del alumno (incluyendo estado_envio y ruta_storage)
   const { data: envios } = await supabase
     .from('envio')
-    .select('id_entrega, nombre_archivo, fecha_hora_envio, calificacion')
+    .select('id_entrega, nombre_archivo, ruta_storage, estado_envio, fecha_hora_envio, calificacion')
+    .eq('no_control', noControl)
+    .in('id_entrega', idsEntregas);
+
+  // Consultar prórrogas individuales del alumno
+  const { data: extensiones } = await supabase
+    .from('permiso_extension')
+    .select('id_entrega, fecha_hora_limite_ext, fecha_hora_cierre_ext')
     .eq('no_control', noControl)
     .in('id_entrega', idsEntregas);
 
@@ -94,11 +118,25 @@ export async function obtenerEntregasAlumno(idAsignacion, noControl) {
     .order('fecha_creacion', { ascending: true });
 
   const mapaEnvios = new Map((envios || []).map((e) => [e.id_entrega, e]));
+  const mapaExt = new Map((extensiones || []).map((ex) => [ex.id_entrega, ex]));
+  const ahora = new Date();
 
   return entregas.map((ent, idx) => {
     const envio = mapaEnvios.get(ent.id_entrega);
-    const fechaCorte = new Date(`${ent.fecha_limite}T${ent.hora_limite || '23:59:00'}`);
-    const cerrada = ent.estado_cierre || new Date() > fechaCorte;
+    const ext = mapaExt.get(ent.id_entrega);
+
+    // Evaluar cierre considerando prórroga individual
+    let cerrada = false;
+    let fechaLimiteTexto = `${ent.fecha_limite} ${ent.hora_limite?.slice(0, 5) || ''}`.trim();
+
+    if (ext) {
+      const limiteExt = new Date(ext.fecha_hora_cierre_ext || ext.fecha_hora_limite_ext);
+      cerrada = !isNaN(limiteExt.getTime()) && ahora > limiteExt;
+      fechaLimiteTexto = `${new Date(ext.fecha_hora_limite_ext).toLocaleString('es-MX')} (Prórroga)`;
+    } else {
+      const fechaCorte = new Date(`${ent.fecha_limite}T${ent.hora_limite || '23:59:00'}`);
+      cerrada = Boolean(ent.estado_cierre) || ahora > fechaCorte;
+    }
 
     const comentariosEntrega = (comentarios || [])
       .filter((c) => c.id_entrega === ent.id_entrega)
@@ -109,11 +147,12 @@ export async function obtenerEntregasAlumno(idAsignacion, noControl) {
 
     return {
       ...ent,
-      no_entrega: ent.no_entrega || idx + 1,
-      fecha_hora_limite: `${ent.fecha_limite} ${ent.hora_limite?.slice(0, 5) || ''}`.trim(),
+      no_entrega: idx + 1,
+      fecha_hora_limite: fechaLimiteTexto,
       estado_cierre: cerrada ? 'Cerrada' : 'Abierta',
-      estado_envio: envio ? 'Enviado' : 'Sin enviar',
+      estado_envio: envio?.estado_envio || 'Sin enviar',
       nombre_archivo: envio?.nombre_archivo || null,
+      ruta_storage: envio?.ruta_storage || null,
       fecha_hora_envio: envio?.fecha_hora_envio
         ? new Date(envio.fecha_hora_envio).toLocaleString('es-MX')
         : null,

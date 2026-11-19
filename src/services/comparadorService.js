@@ -185,6 +185,7 @@ export async function compararEntregaConAnterior({ idAsignacion, idEntregaActual
   // FA_02: Ninguna entrega anterior tiene archivo
   if (!entregaPrevia || !envioPrevio) {
     return {
+      texto: 'Sin entrega previa para comparar',
       titulo: 'Sin entrega previa para comparar',
       sinEntregaPrevia: true,
       omitidas,
@@ -200,9 +201,8 @@ export async function compararEntregaConAnterior({ idAsignacion, idEntregaActual
   if (!actualEsDocx || !previoEsDocx) {
     return {
       titulo: `Comparado contra ${entregaPrevia.etiqueta}`,
-      omitidas,
+      omitidas: [...omitidas, 'La comparación de texto solo está disponible entre archivos .docx.'],
       sinCambios: false,
-      aviso: 'La comparación de texto solo está disponible entre archivos .docx.',
       parrafos: []
     };
   }
