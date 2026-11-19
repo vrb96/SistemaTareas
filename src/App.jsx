@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Users, KeyRound, LogOut } from 'lucide-react';
 import { theme } from './theme';
 
+// Servicio de consultas del Alumno (C.U.9)
+import {
+  obtenerClasesAlumno,
+  obtenerAsignacionesClase,
+  obtenerEntregasAlumno,
+  obtenerEquipoAlumnoEnClase
+} from './services/alumnoConsultaService';
+
 // Vistas Iteración 1 (Profesor)
 import PantallaPrincipal from './views/PantallaPrincipal';
 import PantallaClase from './views/PantallaClase';
@@ -28,62 +36,7 @@ import PantallaEnviosEntrega from './views/PantallaEnviosEntrega';
 import PantallaCalificarEnvio from './views/PantallaCalificarEnvio';
 import PantallaEquipos from './views/PantallaEquipos';
 
-// Datos simulados para probar todas las interfaces de la Iteración 2 al instante
-const MOCK_CLASES_ALUMNO = [
-  {
-    id_clase: 1,
-    nombre: 'Ingeniería de Software',
-    clave: 'ISW-101',
-    grupo: '7A',
-    periodo_escolar: 'Agosto-Diciembre 2026',
-    nombre_profesor: 'Jesús Pablo Damián Nava'
-  },
-  {
-    id_clase: 2,
-    nombre: 'Programación Web',
-    clave: 'WEB-202',
-    grupo: '7B',
-    periodo_escolar: 'Agosto-Diciembre 2026',
-    nombre_profesor: 'Carmen Elizabeth Guzmán Ramírez'
-  }
-];
-
-const MOCK_ASIGNACIONES_ALUMNO = [
-  {
-    id_asignacion: 10,
-    titulo: 'Proyecto Final - Iteración 2',
-    descripcion: 'Desarrollo del sistema web con control de entregas y equipos.'
-  },
-  {
-    id_asignacion: 11,
-    titulo: 'Documentación IEEE 830',
-    descripcion: 'Especificación formal de requisitos y casos de uso.'
-  }
-];
-
-const MOCK_ENTREGAS_ALUMNO = [
-  {
-    id_entrega: 101,
-    no_entrega: 1,
-    instrucciones: 'Subir diagrama de dominio y diccionario de clases en PDF o DOCX.',
-    fecha_hora_limite: '2026-11-20 23:59',
-    estado_cierre: 'Abierta',
-    estado_envio: 'Sin enviar',
-    calificacion: null
-  },
-  {
-    id_entrega: 102,
-    no_entrega: 2,
-    instrucciones: 'Subir prototipo funcional completo.',
-    fecha_hora_limite: '2026-11-28 23:59',
-    estado_cierre: 'Abierta',
-    estado_envio: 'Enviado',
-    nombre_archivo: 'Avance_Iteracion2.docx',
-    fecha_hora_envio: '2026-11-18 09:15',
-    calificacion: 95
-  }
-];
-
+// Datos simulados para las vistas del Profesor pendientes de conectar por los operativos (C.U.11 - C.U.13)
 const MOCK_ENVIOS_PROFESOR = [
   {
     id_alumno: 1,
@@ -149,7 +102,7 @@ const MOCK_ELEGIBLES = [
 ];
 
 export default function App() {
-  // Sesión (C.U.14) - Arranca en Profesor para pruebas directas, o cámbialo a null para iniciar en Login
+  // Sesión (C.U.14)
   const [usuario, setUsuario] = useState({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
   const [mensajeInactividad, setMensajeInactividad] = useState('');
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
@@ -167,12 +120,32 @@ export default function App() {
   const [entregasDeAsignacion, setEntregasDeAsignacion] = useState([]);
   const [alumnoEnvioSeleccionado, setAlumnoEnvioSeleccionado] = useState(null);
 
-  // Selecciones Alumno
+  // Estados Reales Alumno (C.U.9 conectado a Supabase)
+  const [clasesAlumno, setClasesAlumno] = useState([]);
+  const [asignacionesAlumno, setAsignacionesAlumno] = useState([]);
+  const [entregasAlumno, setEntregasAlumno] = useState([]);
+  const [equipoAlumno, setEquipoAlumno] = useState(null);
+  const [cargandoAlumno, setCargandoAlumno] = useState(false);
+
   const [claseAlumnoSel, setClaseAlumnoSel] = useState(null);
   const [asignacionAlumnoSel, setAsignacionAlumnoSel] = useState(null);
   const [entregaAlumnoSel, setEntregaAlumnoSel] = useState(null);
 
   const forzarActualizacion = () => setActualizador((prev) => prev + 1);
+
+  // Obtener número de control desde el correo institucional del alumno
+  const noControlAlumno = usuario?.correo ? usuario.correo.split('@')[0].trim() : '';
+
+  // Cargar clases activas del alumno desde Supabase al cambiar al rol Alumno (C.U.9 Paso 1)
+  useEffect(() => {
+    if (usuario?.rol === 'Alumno' && noControlAlumno) {
+      setCargandoAlumno(true);
+      obtenerClasesAlumno(noControlAlumno)
+        .then((data) => setClasesAlumno(data))
+        .catch((err) => console.error('Error al cargar clases del alumno:', err))
+        .finally(() => setCargandoAlumno(false));
+    }
+  }, [usuario, noControlAlumno]);
 
   // C.U.14 FA_03: Cierre automático tras 30 minutos de inactividad
   useEffect(() => {
@@ -342,15 +315,26 @@ export default function App() {
         </>
       )}
 
-      {/* ================= VISTAS ALUMNO (C.U.9 - C.U.10) ================= */}
+      {/* ================= VISTAS ALUMNO (C.U.9 REAL + C.U.10) ================= */}
       {usuario.rol === 'Alumno' && (
         <>
           {vistaActual === 'PantallaClasesAlumno' && (
             <PantallaClasesAlumno
-              clases={MOCK_CLASES_ALUMNO}
-              onSeleccionarClase={(clase) => {
+              clases={clasesAlumno}
+              cargando={cargandoAlumno}
+              onSeleccionarClase={async (clase) => {
                 setClaseAlumnoSel(clase);
                 setVistaActual('PantallaAsignacionesAlumno');
+                setCargandoAlumno(true);
+                try {
+                  const lista = await obtenerAsignacionesClase(clase.id_clase);
+                  setAsignacionesAlumno(lista);
+                } catch (err) {
+                  console.error('Error al cargar asignaciones:', err);
+                  setAsignacionesAlumno([]);
+                } finally {
+                  setCargandoAlumno(false);
+                }
               }}
             />
           )}
@@ -358,11 +342,24 @@ export default function App() {
           {vistaActual === 'PantallaAsignacionesAlumno' && (
             <PantallaAsignacionesAlumno
               claseActual={claseAlumnoSel}
-              asignaciones={MOCK_ASIGNACIONES_ALUMNO}
+              asignaciones={asignacionesAlumno}
+              cargando={cargandoAlumno}
               onVolver={() => setVistaActual('PantallaClasesAlumno')}
-              onSeleccionarAsignacion={(asig) => {
+              onSeleccionarAsignacion={async (asig) => {
                 setAsignacionAlumnoSel(asig);
                 setVistaActual('PantallaDetalleAsignacionAlumno');
+                try {
+                  const [ents, eq] = await Promise.all([
+                    obtenerEntregasAlumno(asig.id_asignacion, noControlAlumno),
+                    obtenerEquipoAlumnoEnClase(claseAlumnoSel.id_clase, noControlAlumno)
+                  ]);
+                  setEntregasAlumno(ents);
+                  setEquipoAlumno(eq);
+                } catch (err) {
+                  console.error('Error al cargar entregas del alumno:', err);
+                  setEntregasAlumno([]);
+                  setEquipoAlumno(null);
+                }
               }}
             />
           )}
@@ -370,11 +367,8 @@ export default function App() {
           {vistaActual === 'PantallaDetalleAsignacionAlumno' && (
             <PantallaDetalleAsignacionAlumno
               asignacionActual={asignacionAlumnoSel}
-              entregas={MOCK_ENTREGAS_ALUMNO}
-              equipo={{
-                nombre: 'Equipo 1',
-                integrantes: ['Carlos Rigoberto Abelino Chana', 'Samuel David Alarcón Monroy']
-              }}
+              entregas={entregasAlumno}
+              equipo={equipoAlumno}
               onVolver={() => setVistaActual('PantallaAsignacionesAlumno')}
               onSeleccionarEntrega={(ent) => {
                 setEntregaAlumnoSel(ent);
@@ -386,9 +380,7 @@ export default function App() {
           {vistaActual === 'PantallaEntregaAlumno' && (
             <PantallaEntregaAlumno
               entregaActual={entregaAlumnoSel}
-              comentarios={[
-                { fecha: '18/11/2026 09:20', texto: 'Recuerden incluir las tablas de trazabilidad.' }
-              ]}
+              comentarios={entregaAlumnoSel?.comentarios || []}
               onVolver={() => setVistaActual('PantallaDetalleAsignacionAlumno')}
             />
           )}
@@ -465,7 +457,7 @@ export default function App() {
         />
       )}
 
-      {/* Barra Flotante de Pruebas Rápidas de UI (Quitar cuando los operativos conecten Supabase) */}
+      {/* Barra Flotante de Pruebas Rápidas */}
       <div className="fixed bottom-4 left-4 bg-[#2e4578] text-white p-3 rounded-xl shadow-2xl z-50 flex flex-wrap items-center gap-2 text-[12pt] border border-blue-300">
         <span className="font-bold mr-1">Probar UI:</span>
         <button
@@ -503,12 +495,12 @@ export default function App() {
         </button>
         <button
           onClick={() => {
-            setUsuario({ correo: '22520266@chilpancingo.tecnm.mx', rol: 'Alumno' });
+            setUsuario({ correo: '22520266@chilpancingo.itch.mx', rol: 'Alumno' });
             setVistaActual('PantallaClasesAlumno');
           }}
           className="bg-emerald-600 px-2.5 py-1 rounded font-bold hover:bg-emerald-700"
         >
-          Alumno
+          Alumno (22520266)
         </button>
       </div>
     </div>
