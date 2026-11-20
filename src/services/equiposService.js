@@ -303,3 +303,43 @@ export async function eliminarEquipo(idEquipo) {
   if (error) throw error;
   return true;
 }
+
+/**
+ * 7. Saca al alumno del equipo al que pertenezca en la clase de una inscripción (RF010, RF011, RF012)
+ *    Se usa al dar de baja, reactivar o marcar "No participa".
+ */
+export async function sacarAlumnoDeEquipoPorInscripcion(idInscripcion) {
+  const { data: ins, error: errIns } = await supabase
+    .from('inscripcion_clase')
+    .select('id_clase, no_control')
+    .eq('id_inscripcion', idInscripcion)
+    .single();
+  if (errIns) throw errIns;
+
+  const { data: equiposClase, error: errEq } = await supabase
+    .from('equipo')
+    .select('id_equipo')
+    .eq('id_clase', ins.id_clase);
+  if (errEq) throw errEq;
+
+  const ids = (equiposClase || []).map((e) => e.id_equipo);
+  if (ids.length === 0) return false;
+
+  const { data: borrados, error: errDel } = await supabase
+    .from('integrantes_equipo')
+    .delete()
+    .in('id_equipo', ids)
+    .eq('no_control', ins.no_control)
+    .select('id_equipo');
+  if (errDel) throw errDel;
+
+  // Actualizar el conteo del equipo del que salió
+  for (const { id_equipo } of borrados || []) {
+    const { count } = await supabase
+      .from('integrantes_equipo')
+      .select('*', { count: 'exact', head: true })
+      .eq('id_equipo', id_equipo);
+    await supabase.from('equipo').update({ numero_integrantes: count || 0 }).eq('id_equipo', id_equipo);
+  }
+  return (borrados || []).length > 0;
+}

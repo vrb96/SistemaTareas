@@ -44,21 +44,20 @@ import {
   obtenerEnviosDeEntrega,
   compararEntregaConAnterior
 } from './services/comparadorService';
-import { obtenerComentariosEntrega } from './services/evaluacionesService';
-
-const MOCK_EQUIPOS = [
-  {
-    id: 1,
-    nombre: 'Equipo 1',
-    integrantes: [
-      { id_alumno: 1, no_control: '22520266', nombre_completo: 'Abelino Chana Carlos Rigoberto' }
-    ]
-  }
-];
-
-const MOCK_ELEGIBLES = [
-  { id_alumno: 3, no_control: '22520191', nombre_completo: 'Armenta Ortega Jorge Armando' }
-];
+import {
+  obtenerComentariosEntrega,
+  guardarCalificacion,
+  otorgarExtensionIndividual,
+  agregarComentario,
+  editarComentario,
+  eliminarComentario
+} from './services/evaluacionesService';
+import {
+  obtenerDatosEquiposClase,
+  guardarEquiposGenerados,
+  actualizarEquipo,
+  eliminarEquipo
+} from './services/equiposService';
 
 // Helper para extraer el número de entrega (1, 2, 3...) desde "Entrega 2" o la lista
 function obtenerNumeroEntrega(entrega, listaEntregas = []) {
@@ -101,6 +100,8 @@ export default function App() {
   const [comparacionActual, setComparacionActual] = useState(null);
   const [cargandoComparacion, setCargandoComparacion] = useState(false);
   const [comentariosProfesor, setComentariosProfesor] = useState([]);
+  const [datosEquipos, setDatosEquipos] = useState(null); // C.U.13 { equipos, elegibles, totalAlumnosClase }
+  const [errorEquipos, setErrorEquipos] = useState('');
 
   // Selecciones y estados reales C.U.9 y C.U.10 (Alumno)
   const [clasesAlumno, setClasesAlumno] = useState([]);
@@ -112,6 +113,20 @@ export default function App() {
   const [entregaAlumnoSel, setEntregaAlumnoSel] = useState(null);
 
   const forzarActualizacion = () => setActualizador((prev) => prev + 1);
+
+  // --- CARGA REAL PROFESOR: C.U.13 (Equipos de la clase) ---
+  useEffect(() => {
+    if (usuario?.rol !== 'Profesor' || vistaActual !== 'PantallaEquipos' || !claseSeleccionada?.id_clase) return;
+    let cancelado = false;
+    setDatosEquipos(null);
+    setErrorEquipos('');
+    obtenerDatosEquiposClase(claseSeleccionada.id_clase)
+      .then((datos) => !cancelado && setDatosEquipos(datos))
+      .catch((err) => !cancelado && setErrorEquipos(err.message || 'No se pudieron cargar los equipos'));
+    return () => {
+      cancelado = true;
+    };
+  }, [usuario, vistaActual, claseSeleccionada]);
 
   // C.U.14 FA_03: Cierre automático tras 30 minutos de inactividad
   useEffect(() => {
@@ -365,15 +380,77 @@ export default function App() {
                   alert(err.message);
                 }
               }}
+              onGuardarCalificacion={async (calificacion) => {
+                await guardarCalificacion({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  calificacion
+                });
+                forzarActualizacion();
+              }}
+              onGuardarExtension={({ fecha_hora_limite_ext, fecha_hora_cierre_ext }) =>
+                otorgarExtensionIndividual({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  uidProfesor: usuario?.uid ?? null,
+                  fecha_hora_limite_ext,
+                  fecha_hora_cierre_ext
+                })
+              }
+              onGuardarComentario={(item) =>
+                agregarComentario({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  uidProfesor: usuario?.uid ?? null,
+                  texto: item.texto
+                })
+              }
+              onEditarComentario={(id, texto) => editarComentario(id, texto)}
+              onEliminarComentario={(id) => eliminarComentario(id)}
             />
           )}
 
-          {vistaActual === 'PantallaEquipos' && (
+          {vistaActual === 'PantallaEquipos' && !datosEquipos && (
+            <div className="p-8 text-[16pt] text-gray-600">
+              {errorEquipos || 'Cargando equipos...'}
+            </div>
+          )}
+
+          {vistaActual === 'PantallaEquipos' && datosEquipos && (
             <PantallaEquipos
-              equiposIniciales={MOCK_EQUIPOS}
-              alumnosElegiblesIniciales={MOCK_ELEGIBLES}
-              totalAlumnosClase={6}
+              key={claseSeleccionada?.id_clase}
+              equiposIniciales={datosEquipos.equipos}
+              alumnosElegiblesIniciales={datosEquipos.elegibles}
+              totalAlumnosClase={datosEquipos.totalAlumnosClase}
               onVolver={() => setVistaActual('PantallaClase')}
+              onGuardarEquiposGenerados={async (propuestos) => {
+                await guardarEquiposGenerados(claseSeleccionada.id_clase, propuestos);
+                return obtenerDatosEquiposClase(claseSeleccionada.id_clase);
+              }}
+              onActualizarEquipo={async (editado, movidos = []) => {
+                const idClase = claseSeleccionada.id_clase;
+                // 1) Guardar el equipo editado (nombre e integrantes; los movidos ya no están en él)
+                await actualizarEquipo(idClase, editado);
+                // 2) Agregar los integrantes movidos a sus equipos destino
+                const actuales = await obtenerDatosEquiposClase(idClase);
+                const destinos = [...new Set(movidos.map((m) => String(m.destinoId)))];
+                for (const idDestino of destinos) {
+                  const destino = actuales.equipos.find((eq) => String(eq.id) === idDestino);
+                  if (!destino) continue;
+                  const llegan = movidos
+                    .filter((m) => String(m.destinoId) === idDestino)
+                    .map((m) => ({ ...m.alumno, rol_equipo: 'Integrante' }));
+                  await actualizarEquipo(idClase, {
+                    ...destino,
+                    integrantes: [...destino.integrantes, ...llegan]
+                  });
+                }
+                return obtenerDatosEquiposClase(idClase);
+              }}
+              onEliminarEquipo={async (idEquipo) => {
+                await eliminarEquipo(idEquipo);
+                return obtenerDatosEquiposClase(claseSeleccionada.id_clase);
+              }}
             />
           )}
         </>

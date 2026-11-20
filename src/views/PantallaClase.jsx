@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, UserCheck } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { sacarAlumnoDeEquipoPorInscripcion } from '../services/equiposService';
 import iconoEliminar from '../assets/eliminar.svg';
 import iconoEditar from '../assets/editar.svg';
 
@@ -45,6 +46,14 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
       .from('inscripcion_clase')
       .update({ participacion: nuevoValor })
       .eq('id_inscripcion', idInscripcion);
+    // RF012: al cambiar a No participa sale del equipo al que pertenezca
+    if (nuevoValor !== 'Si') {
+      try {
+        await sacarAlumnoDeEquipoPorInscripcion(idInscripcion);
+      } catch (err) {
+        console.error('Error al sacar al alumno de su equipo:', err);
+      }
+    }
     cargarAlumnos();
   };
 

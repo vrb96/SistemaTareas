@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { sacarAlumnoDeEquipoPorInscripcion } from '../services/equiposService';
 
 export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActualizacion }) => {
   const alumnoData = alumnoItem?.alumno || {};
@@ -43,6 +44,8 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
           .update({ estado_inscripcion: 'Inactiva' })
           .eq('id_inscripcion', alumnoItem.id_inscripcion);
         if (dbError) throw dbError;
+        // RF010: al darse de baja sale del equipo al que pertenezca en la clase
+        await sacarAlumnoDeEquipoPorInscripcion(alumnoItem.id_inscripcion);
       } else if (esReactivar) {
         // Reactivación
         const { error: dbError } = await supabase
@@ -50,6 +53,8 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
           .update({ estado_inscripcion: 'Activa' })
           .eq('id_inscripcion', alumnoItem.id_inscripcion);
         if (dbError) throw dbError;
+        // RF011: al reactivarse queda sin equipo
+        await sacarAlumnoDeEquipoPorInscripcion(alumnoItem.id_inscripcion);
       } else if (esEditar) {
         if (!nombre.trim() || !apPaterno.trim()) {
           throw new Error('Nombre y Apellido Paterno son obligatorios');
