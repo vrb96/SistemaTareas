@@ -7,6 +7,7 @@ export default function PantallaEquipos({
   equiposIniciales = [],
   alumnosElegiblesIniciales = [],
   totalAlumnosClase = 0,
+  tituloAsignacion = '',
   onVolver,
   onGuardarEquiposGenerados,
   onActualizarEquipo,
@@ -350,8 +351,11 @@ export default function PantallaEquipos({
           >
             <ChevronLeft size={24} /> Volver
           </button>
-          <h1 className={`text-[28pt] font-bold ${theme.textSuperficie} ${theme.font}`}>
+          <h1 className={`text-[28pt] font-bold text-center ${theme.textSuperficie} ${theme.font}`}>
             Equipos
+            {tituloAsignacion && (
+              <span className="block text-[16pt] font-semibold text-gray-600">{tituloAsignacion}</span>
+            )}
           </h1>
         </div>
 

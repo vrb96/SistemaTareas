@@ -82,12 +82,6 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
         >
           Asignaciones
         </button>
-        <button
-          onClick={() => setVistaActual('PantallaEquipos')}
-          className={`${theme.bgContenedor} ${theme.textContenedor} py-2 rounded text-[16pt] font-bold text-center hover:bg-blue-200 ${theme.font}`}
-        >
-          Equipos
-        </button>
       </div>
 
       <div className="w-4/5 p-8 overflow-y-auto">

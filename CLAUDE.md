@@ -46,7 +46,10 @@ Reglas clave:
 - ✅ C.U.12: calificación, extensión y comentarios conectados en App.jsx → `evaluacionesService`. La vista muestra los
   errores del servicio. El envío del alumno respeta la extensión (`verificarEntregaAbiertaParaAlumno`).
   `uidProfesor` se pasa como `usuario?.uid`, que será `null` hasta que exista el login real (C.U.14).
-- ✅ C.U.13: App.jsx carga los equipos con `obtenerDatosEquiposClase`. Cada callback de `PantallaEquipos` hace la operación y
+- ✅ C.U.13: **los equipos son por ASIGNACIÓN** (`equipo.id_asignacion`, script `supabase/equipos_por_asignacion.sql`;
+  se conserva `id_clase` para RLS). El botón "Equipos" está en PantallaEntregas y vuelve a ella.
+  Elegible = Activa + Participa + sin equipo en esa asignación. El alumno ve su equipo de la asignación con
+  `obtenerEquipoAlumnoEnAsignacion`. App.jsx carga los equipos con `obtenerDatosEquiposAsignacion`. Cada callback de `PantallaEquipos` hace la operación y
   devuelve los datos frescos `{ equipos, elegibles }`. La vista previa usa `generarPropuestaEquiposAleatorios` (evita equipos
   de 1 integrante). Los "Mover a..." se acumulan y se guardan al presionar Guardar; Cancelar los descarta.
   RF010/RF011/RF012: la baja, la reactivación y "No participa" sacan al alumno de su equipo
@@ -60,6 +63,9 @@ Reglas clave:
   crea la cuenta del profesor (editar correo/contraseña en la sección 5), migra las clases de 'profesor-de-prueba-id'
   y crea las cuentas de los alumnos existentes.
 - ✅ `cu14_auth.sql` ya se ejecutó (2026-11-19) y el login real funciona.
+- RLS: `supabase/rls_politicas.sql`. Profesor → todo lo de sus clases. Alumno → lectura de sus clases activas y
+  escritura solo de sus envíos y archivos. Trigger `proteger_calificacion` en envio y bucket `entregas` privado.
+  Al agregar tablas o consultas nuevas, revisa que la política correspondiente las permita.
 - ✅ RF009: ModalGestionAlumno llama a `rpc('actualizar_alumno')` (`supabase/rf009_editar_alumno.sql`). Si cambia el
   no. de control, en una transacción: valida que no exista, mueve el historial de toda tabla con columna `no_control`,
   y actualiza `alumno.correo`, `usuario.correo` y auth.users/identities sin tocar la contraseña. El correo ya no

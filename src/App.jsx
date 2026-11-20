@@ -33,7 +33,7 @@ import {
   obtenerClasesAlumno,
   obtenerAsignacionesClase,
   obtenerEntregasAlumno,
-  obtenerEquipoAlumnoEnClase
+  obtenerEquipoAlumnoEnAsignacion
 } from './services/alumnoConsultaService';
 import {
   enviarArchivoEntrega,
@@ -53,7 +53,7 @@ import {
   eliminarComentario
 } from './services/evaluacionesService';
 import {
-  obtenerDatosEquiposClase,
+  obtenerDatosEquiposAsignacion,
   guardarEquiposGenerados,
   actualizarEquipo,
   eliminarEquipo
@@ -137,19 +137,24 @@ export default function App() {
     setMensajeInactividad(mensaje);
   };
 
-  // --- CARGA REAL PROFESOR: C.U.13 (Equipos de la clase) ---
+  // --- CARGA REAL PROFESOR: C.U.13 (Equipos de la asignación) ---
   useEffect(() => {
-    if (usuario?.rol !== 'Profesor' || vistaActual !== 'PantallaEquipos' || !claseSeleccionada?.id_clase) return;
+    if (
+      usuario?.rol !== 'Profesor' ||
+      vistaActual !== 'PantallaEquipos' ||
+      !claseSeleccionada?.id_clase ||
+      !asignacionSeleccionada?.id_asignacion
+    ) return;
     let cancelado = false;
     setDatosEquipos(null);
     setErrorEquipos('');
-    obtenerDatosEquiposClase(claseSeleccionada.id_clase)
+    obtenerDatosEquiposAsignacion(claseSeleccionada.id_clase, asignacionSeleccionada.id_asignacion)
       .then((datos) => !cancelado && setDatosEquipos(datos))
       .catch((err) => !cancelado && setErrorEquipos(err.message || 'No se pudieron cargar los equipos'));
     return () => {
       cancelado = true;
     };
-  }, [usuario, vistaActual, claseSeleccionada]);
+  }, [usuario, vistaActual, claseSeleccionada, asignacionSeleccionada]);
 
   // C.U.14 FA_03: Cierre automático tras 30 minutos de inactividad
   useEffect(() => {
@@ -196,9 +201,7 @@ export default function App() {
     const noControl = obtenerNoControl(usuario);
     Promise.all([
       obtenerEntregasAlumno(asignacionAlumnoSel.id_asignacion, noControl),
-      claseAlumnoSel?.id_clase
-        ? obtenerEquipoAlumnoEnClase(claseAlumnoSel.id_clase, noControl)
-        : Promise.resolve(null)
+      obtenerEquipoAlumnoEnAsignacion(asignacionAlumnoSel.id_asignacion, noControl)
     ])
       .then(([ents, eq]) => {
         setEntregasAlumno(ents);
@@ -441,21 +444,25 @@ export default function App() {
 
           {vistaActual === 'PantallaEquipos' && datosEquipos && (
             <PantallaEquipos
-              key={claseSeleccionada?.id_clase}
+              key={asignacionSeleccionada?.id_asignacion}
+              tituloAsignacion={asignacionSeleccionada?.titulo}
               equiposIniciales={datosEquipos.equipos}
               alumnosElegiblesIniciales={datosEquipos.elegibles}
               totalAlumnosClase={datosEquipos.totalAlumnosClase}
-              onVolver={() => setVistaActual('PantallaClase')}
+              onVolver={() => setVistaActual('PantallaEntregas')}
               onGuardarEquiposGenerados={async (propuestos) => {
-                await guardarEquiposGenerados(claseSeleccionada.id_clase, propuestos);
-                return obtenerDatosEquiposClase(claseSeleccionada.id_clase);
+                const idClase = claseSeleccionada.id_clase;
+                const idAsig = asignacionSeleccionada.id_asignacion;
+                await guardarEquiposGenerados(idClase, idAsig, propuestos);
+                return obtenerDatosEquiposAsignacion(idClase, idAsig);
               }}
               onActualizarEquipo={async (editado, movidos = []) => {
                 const idClase = claseSeleccionada.id_clase;
+                const idAsig = asignacionSeleccionada.id_asignacion;
                 // 1) Guardar el equipo editado (nombre e integrantes; los movidos ya no están en él)
-                await actualizarEquipo(idClase, editado);
+                await actualizarEquipo(idAsig, editado);
                 // 2) Agregar los integrantes movidos a sus equipos destino
-                const actuales = await obtenerDatosEquiposClase(idClase);
+                const actuales = await obtenerDatosEquiposAsignacion(idClase, idAsig);
                 const destinos = [...new Set(movidos.map((m) => String(m.destinoId)))];
                 for (const idDestino of destinos) {
                   const destino = actuales.equipos.find((eq) => String(eq.id) === idDestino);
@@ -463,16 +470,19 @@ export default function App() {
                   const llegan = movidos
                     .filter((m) => String(m.destinoId) === idDestino)
                     .map((m) => ({ ...m.alumno, rol_equipo: 'Integrante' }));
-                  await actualizarEquipo(idClase, {
+                  await actualizarEquipo(idAsig, {
                     ...destino,
                     integrantes: [...destino.integrantes, ...llegan]
                   });
                 }
-                return obtenerDatosEquiposClase(idClase);
+                return obtenerDatosEquiposAsignacion(idClase, idAsig);
               }}
               onEliminarEquipo={async (idEquipo) => {
                 await eliminarEquipo(idEquipo);
-                return obtenerDatosEquiposClase(claseSeleccionada.id_clase);
+                return obtenerDatosEquiposAsignacion(
+                  claseSeleccionada.id_clase,
+                  asignacionSeleccionada.id_asignacion
+                );
               }}
             />
           )}

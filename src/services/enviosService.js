@@ -31,6 +31,21 @@ export function validarArchivoEnvio(file) {
   return true;
 }
 
+
+/**
+ * RF024: el archivo debe ser un documento válido, no solo tener la extensión.
+ * Un .docx es un ZIP (firma "PK\x03\x04") y un .pdf inicia con "%PDF".
+ */
+export async function validarContenidoArchivoEnvio(file) {
+  const cabecera = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const esDocx = cabecera[0] === 0x50 && cabecera[1] === 0x4b && cabecera[2] === 0x03 && cabecera[3] === 0x04;
+  const esPdf = cabecera[0] === 0x25 && cabecera[1] === 0x50 && cabecera[2] === 0x44 && cabecera[3] === 0x46;
+  const nombreLower = file.name.toLowerCase();
+  if ((nombreLower.endsWith('.docx') && !esDocx) || (nombreLower.endsWith('.pdf') && !esPdf)) {
+    throw new Error('El archivo está dañado o no es un documento válido.');
+  }
+  return true;
+}
 /**
  * Helper interno para construir fecha local sin desfases UTC
  */
@@ -109,6 +124,7 @@ export async function enviarArchivoEntrega({ idEntrega, noControl, archivo, idEq
   // Si el alumno adjuntó un archivo nuevo (File), lo validamos y subimos a Storage
   if (archivo instanceof File) {
     validarArchivoEnvio(archivo);
+    await validarContenidoArchivoEnvio(archivo);
 
     // FA_02: Si había un archivo anterior en Storage, eliminarlo antes de sustituir
     if (envioPrevio?.ruta_storage) {

@@ -15,9 +15,10 @@ function formatearAlumno(al) {
 }
 
 /**
- * 1. Obtiene los equipos actuales, alumnos elegibles sin equipo y total de alumnos activos (C.U.13 Paso 1)
+ * 1. Obtiene los equipos de una ASIGNACIÓN, los alumnos elegibles sin equipo en ella
+ *    y el total de alumnos activos de la clase (C.U.13 Paso 1)
  */
-export async function obtenerDatosEquiposClase(idClase) {
+export async function obtenerDatosEquiposAsignacion(idClase, idAsignacion) {
   // Traer todos los alumnos con inscripción Activa en la clase
   const { data: inscritos, error: errIns } = await supabase
     .from('inscripcion_clase')
@@ -54,7 +55,7 @@ export async function obtenerDatosEquiposClase(idClase) {
         )
       )
     `)
-    .eq('id_clase', idClase)
+    .eq('id_asignacion', idAsignacion)
     .order('nombre_numero_equipo', { ascending: true });
 
   if (errEq) throw errEq;
@@ -79,7 +80,7 @@ export async function obtenerDatosEquiposClase(idClase) {
     };
   });
 
-  // Elegibles: inscripción Activa, participación "Si" o "Participa", y sin equipo asignado
+  // Elegibles: inscripción Activa, participación "Si" o "Participa", y sin equipo en esta asignación
   const elegibles = (inscritos || [])
     .filter((item) => {
       const participa =
@@ -161,7 +162,7 @@ export function generarPropuestaEquiposAleatorios({
 /**
  * 3. Guarda en Supabase los equipos confirmados desde la vista previa (C.U.13 Paso 8)
  */
-export async function guardarEquiposGenerados(idClase, equiposPropuestos) {
+export async function guardarEquiposGenerados(idClase, idAsignacion, equiposPropuestos) {
   const guardados = [];
 
   for (const prop of equiposPropuestos) {
@@ -169,6 +170,7 @@ export async function guardarEquiposGenerados(idClase, equiposPropuestos) {
       .from('equipo')
       .insert([{
         id_clase: idClase,
+        id_asignacion: idAsignacion,
         nombre_numero_equipo: prop.nombre.trim(),
         numero_integrantes: prop.integrantes.length
       }])
@@ -204,17 +206,17 @@ export async function guardarEquiposGenerados(idClase, equiposPropuestos) {
 /**
  * 4. Actualiza nombre e integrantes de un equipo (agregar, quitar o mover) (C.U.13 FA_03 y FA_04)
  */
-export async function actualizarEquipo(idClase, equipoEditado) {
+export async function actualizarEquipo(idAsignacion, equipoEditado) {
   const nombreLimpio = (equipoEditado.nombre || '').trim();
   if (!nombreLimpio || nombreLimpio.length > 80) {
     throw new Error('El nombre del equipo no es válido o ya existe.');
   }
 
-  // Validar que no exista otro equipo con el mismo nombre en la misma clase
+  // Validar que no exista otro equipo con el mismo nombre en la misma asignación
   const { data: duplicado } = await supabase
     .from('equipo')
     .select('id_equipo')
-    .eq('id_clase', idClase)
+    .eq('id_asignacion', idAsignacion)
     .ilike('nombre_numero_equipo', nombreLimpio)
     .neq('id_equipo', equipoEditado.id)
     .maybeSingle();

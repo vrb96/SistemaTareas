@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 import { sacarAlumnoDeEquipoPorInscripcion } from '../services/equiposService';
+import { validarDatosAlumno } from '../validaciones';
 
 const esEditarFn = (accion) => accion === 'EditarAlumno';
 
@@ -46,11 +47,17 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
     setError('');
 
     // RF009: antes de guardar, avisar del cambio de correo de acceso
-    if (esEditar && noControlCambio && !avisoCorreo) {
-      if (!/^([A-Za-z]\d{8}|\d{8})$/.test(noControl.trim())) {
-        setError('El número de control no tiene un formato válido');
+    // RF009: mismas validaciones de RF005
+    if (esEditar) {
+      const errorValidacion = validarDatosAlumno({
+        noControl, nombre, apellidoPaterno: apPaterno, apellidoMaterno: apMaterno
+      });
+      if (errorValidacion) {
+        setError(errorValidacion);
         return;
       }
+    }
+    if (esEditar && noControlCambio && !avisoCorreo) {
       setAvisoCorreo(correoPara(noControl));
       return;
     }
@@ -76,10 +83,6 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
         // RF011: al reactivarse queda sin equipo
         await sacarAlumnoDeEquipoPorInscripcion(alumnoItem.id_inscripcion);
       } else if (esEditar) {
-        if (!noControl.trim() || !nombre.trim() || !apPaterno.trim()) {
-          throw new Error('El número de control, el nombre y el apellido paterno son obligatorios');
-        }
-
         // RF009: actualiza datos (y, si cambió el no. de control, historial + correo de acceso) en una transacción
         const { data: correoFinal, error: dbError } = await supabase.rpc('actualizar_alumno', {
           p_no_control_actual: noControlOriginal,
@@ -164,7 +167,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
             <input
               type="text"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => setNombre(e.target.value)} maxLength={50}
               disabled={!esEditar}
               className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
             />
@@ -176,7 +179,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
                 <input
                 type="text"
                 value={apPaterno}
-                onChange={(e) => setApPaterno(e.target.value)}
+                onChange={(e) => setApPaterno(e.target.value)} maxLength={50}
                 disabled={!esEditar}
                 className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
                 />
@@ -186,7 +189,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
                 <input
                 type="text"
                 value={apMaterno}
-                onChange={(e) => setApMaterno(e.target.value)}
+                onChange={(e) => setApMaterno(e.target.value)} maxLength={50}
                 disabled={!esEditar}
                 className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
                 />

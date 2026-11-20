@@ -1,5 +1,6 @@
 // src/services/evaluacionesService.js
 import { supabase } from '../supa/supabaseClient';
+import { validarExtension } from '../validaciones';
 
 /**
  * 1. Registrar o editar calificación entera (0 - 100) (C.U.12 Pasos 3-5, FA_01 y FA_02)
@@ -68,8 +69,10 @@ export async function otorgarExtensionIndividual({
   fecha_hora_limite_ext,
   fecha_hora_cierre_ext = null
 }) {
-  if (!fecha_hora_limite_ext) {
-    throw new Error('Debe especificar la nueva fecha y hora límite.');
+  // RF034: la extensión debe tener una fecha límite futura y un cierre no anterior a ella
+  const errorExtension = validarExtension(fecha_hora_limite_ext, fecha_hora_cierre_ext);
+  if (errorExtension) {
+    throw new Error(errorExtension);
   }
 
   const limiteISO = new Date(fecha_hora_limite_ext).toISOString();

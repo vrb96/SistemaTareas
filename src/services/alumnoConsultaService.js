@@ -162,16 +162,16 @@ export async function obtenerEntregasAlumno(idAsignacion, noControl) {
   });
 }
 
-// 4. Obtener equipo del alumno en la clase (para mostrar en PantallaDetalleAsignacionAlumno)
-export async function obtenerEquipoAlumnoEnClase(idClase, noControl) {
+// 4. Obtener el equipo del alumno en una asignación (RF041, PantallaDetalleAsignacionAlumno)
+export async function obtenerEquipoAlumnoEnAsignacion(idAsignacion, noControl) {
   const { data: membresia } = await supabase
     .from('integrantes_equipo')
     .select(`
       id_equipo,
-      equipo!inner ( id_equipo, id_clase, nombre_numero_equipo )
+      equipo!inner ( id_equipo, id_asignacion, nombre_numero_equipo )
     `)
     .eq('no_control', noControl)
-    .eq('equipo.id_clase', idClase)
+    .eq('equipo.id_asignacion', idAsignacion)
     .maybeSingle();
 
   if (!membresia?.equipo) return null;

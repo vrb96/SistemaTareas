@@ -68,6 +68,12 @@ export default function PantallaEntregas({
         >
           Entregas
         </button>
+        <button
+          onClick={() => setVistaActual('PantallaEquipos')}
+          className={`${theme.bgContenedor} ${theme.textContenedor} py-2 rounded text-[16pt] font-bold text-center hover:bg-blue-200 ${theme.font}`}
+        >
+          Equipos
+        </button>
       </div>
 
       {/* Área Principal */}
