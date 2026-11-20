@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 
-export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
+export const ModalCrearClase = ({ setModalActual, onActualizacion, uidProfesor }) => {
   const [nombre, setNombre] = useState('');
   const [clave, setClave] = useState('');
   const [grupo, setGrupo] = useState('');
@@ -43,7 +43,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
       const { data: clasesDuplicadas, error: searchError } = await supabase
         .from('clase')
         .select('id_clase')
-        .eq('uid_profesor', 'profesor-de-prueba-id')
+        .eq('uid_profesor', uidProfesor)
         .eq('clave', clave.trim())
         .eq('grupo', grupo.trim())
         .eq('periodo_escolar', periodoEscolar)
@@ -59,7 +59,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
       const { error: insertError } = await supabase
         .from('clase')
         .insert([{
-          uid_profesor: 'profesor-de-prueba-id',
+          uid_profesor: uidProfesor,
           nombre: nombre.trim(),
           clave: clave.trim(),
           grupo: grupo.trim(),

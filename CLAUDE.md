@@ -51,9 +51,16 @@ Reglas clave:
   de 1 integrante). Los "Mover a..." se acumulan y se guardan al presionar Guardar; Cancelar los descarta.
   RF010/RF011/RF012: la baja, la reactivación y "No participa" sacan al alumno de su equipo
   (`sacarAlumnoDeEquipoPorInscripcion`).
-- 🔴 C.U.14: el login está **simulado**. `PantallaLogin` deduce el rol según si el correo contiene "alumno", y App.jsx arranca
-  con un usuario fijo (`profesor@...`). `ModalCambiarContrasena` no está conectado a Auth. Ya funcionan el temporizador de
-  inactividad (App.jsx) y el botón de cerrar sesión, pero este solo hace `setUsuario(null)` y no llama a `supabase.auth.signOut()`.
-  **Falta:** `signInWithPassword` y resolver el rol desde `profesor` / `alumno`; cambio de contraseña obligatorio;
-  `updateUser` reautenticando con la contraseña actual; `signOut`; restaurar la sesión con `getSession` / `onAuthStateChange`.
-  Además hay que quitar el usuario fijo y `noControlPrueba`.
+- ✅ C.U.14 (código): `src/services/authService.js` con signInWithPassword, getSession, updateUser + rpc y signOut.
+  Rol y marca de cambio pendiente en la tabla `usuario` (uid, correo, rol, no_control, cambio_contrasena_pendiente).
+  RF007: el profesor crea la cuenta del alumno nuevo con `rpc('crear_cuenta_alumno')` desde ModalRegistrarAlumno y
+  ModalCargaMasiva (contraseña inicial = no. de control). Con cambio pendiente se abre ModalCambiarContrasena obligatorio.
+  Las clases se filtran y crean con `usuario.uid`. Se quitaron el usuario fijo y la barra de pruebas.
+- ⚠️ **Requiere ejecutar `supabase/cu14_auth.sql`** en el SQL Editor: crea la tabla `usuario` y las funciones,
+  crea la cuenta del profesor (editar correo/contraseña en la sección 5), migra las clases de 'profesor-de-prueba-id'
+  y crea las cuentas de los alumnos existentes.
+- ✅ `cu14_auth.sql` ya se ejecutó (2026-11-19) y el login real funciona.
+- ✅ RF009: ModalGestionAlumno llama a `rpc('actualizar_alumno')` (`supabase/rf009_editar_alumno.sql`). Si cambia el
+  no. de control, en una transacción: valida que no exista, mueve el historial de toda tabla con columna `no_control`,
+  y actualiza `alumno.correo`, `usuario.correo` y auth.users/identities sin tocar la contraseña. El correo ya no
+  se edita a mano: se deriva del no. de control. Antes de guardar se muestra el aviso "El correo de acceso del alumno cambiará a…".

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { crearCuentaAlumno } from '../services/authService';
 
 export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion }) => {
   const [noControl, setNoControl] = useState('');
@@ -97,6 +98,9 @@ export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion 
             correo: correoFinal
           }]);
         if (insertAlumnoError) throw insertAlumnoError;
+
+        // RF007: cuenta de acceso (contraseña inicial = no. de control, cambio pendiente)
+        await crearCuentaAlumno(noControl.trim());
 
         const { error: insertInscripcionError } = await supabase
           .from('inscripcion_clase')

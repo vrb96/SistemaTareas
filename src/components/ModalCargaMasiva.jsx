@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, Download, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { crearCuentaAlumno } from '../services/authService';
 import * as XLSX from 'xlsx';
 
 // Variable global para compartir resultados entre ventanas
@@ -103,7 +104,7 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
         }
 
         const correo = `l${datoControl}@chilpancingo.tecnm.mx`;
-        const passwordTemporal = `${datoControl}2026`;
+        const passwordTemporal = datoControl; // RF007: contraseña inicial = número de control
 
         try {
           // Validar si ya está en esta clase (Omitido o Reactivado)
@@ -146,13 +147,17 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
             resumenCarga.inscritosExistentes++;
           } else {
             // Es totalmente nuevo: Registrarlo e inscribirlo
-            await supabase.from('alumno').insert([{
+            const { error: errAlumno } = await supabase.from('alumno').insert([{
               no_control: datoControl,
               nombre: nombreReal,
               apellido_paterno: apPaterno,
               apellido_materno: apMaterno,
               correo: correo
             }]);
+            if (errAlumno) throw errAlumno;
+
+            // RF007: cuenta de acceso del alumno nuevo
+            await crearCuentaAlumno(datoControl);
 
             await supabase.from('inscripcion_clase').insert([{
               id_clase: idClase,

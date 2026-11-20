@@ -58,6 +58,7 @@ import {
   actualizarEquipo,
   eliminarEquipo
 } from './services/equiposService';
+import { obtenerSesionActual, cerrarSesion, cambiarContrasena } from './services/authService';
 
 // Helper para extraer el número de entrega (1, 2, 3...) desde "Entrega 2" o la lista
 function obtenerNumeroEntrega(entrega, listaEntregas = []) {
@@ -77,8 +78,8 @@ function obtenerNoControl(usuario) {
 }
 
 export default function App() {
-  const [usuario, setUsuario] = useState({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
-  const [noControlPrueba, setNoControlPrueba] = useState('22520191');
+  const [usuario, setUsuario] = useState(null);
+  const [cargandoSesion, setCargandoSesion] = useState(true);
   const [mensajeInactividad, setMensajeInactividad] = useState('');
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
 
@@ -114,6 +115,28 @@ export default function App() {
 
   const forzarActualizacion = () => setActualizador((prev) => prev + 1);
 
+  // C.U.14: restaurar la sesión guardada de Supabase al recargar la página
+  useEffect(() => {
+    obtenerSesionActual()
+      .then((u) => {
+        if (u) {
+          setUsuario(u);
+          setVistaActual(u.rol === 'Alumno' ? 'PantallaClasesAlumno' : 'PantallaPrincipal');
+        }
+      })
+      .finally(() => setCargandoSesion(false));
+  }, []);
+
+  // RF044: cerrar sesión (también la usa el cierre por inactividad)
+  const salirDelSistema = async (mensaje = '') => {
+    await cerrarSesion();
+    setUsuario(null);
+    setMenuUsuarioAbierto(false);
+    setModalActual(null);
+    setVistaActual('PantallaPrincipal');
+    setMensajeInactividad(mensaje);
+  };
+
   // --- CARGA REAL PROFESOR: C.U.13 (Equipos de la clase) ---
   useEffect(() => {
     if (usuario?.rol !== 'Profesor' || vistaActual !== 'PantallaEquipos' || !claseSeleccionada?.id_clase) return;
@@ -135,9 +158,7 @@ export default function App() {
     const reiniciarTimer = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        setUsuario(null);
-        setMenuUsuarioAbierto(false);
-        setMensajeInactividad('Tu sesión ha expirado por inactividad');
+        salirDelSistema('Tu sesión ha expirado por inactividad');
       }, 30 * 60 * 1000);
     };
     const eventos = ['mousemove', 'keydown', 'click', 'scroll'];
@@ -229,6 +250,10 @@ export default function App() {
       .finally(() => setCargandoComparacion(false));
   }, [usuario, vistaActual, asignacionSeleccionada, entregaSeleccionada, alumnoEnvioSeleccionado]);
 
+  if (cargandoSesion) {
+    return <div className="min-h-screen flex items-center justify-center text-[16pt] text-gray-600">Cargando...</div>;
+  }
+
   if (!usuario) {
     return (
       <PantallaLogin
@@ -293,10 +318,7 @@ export default function App() {
                 <KeyRound size={18} /> Cambiar contraseña
               </button>
               <button
-                onClick={() => {
-                  setMenuUsuarioAbierto(false);
-                  setUsuario(null);
-                }}
+                onClick={() => salirDelSistema()}
                 className="w-full text-left px-4 py-2.5 hover:bg-gray-600 flex items-center gap-2 border-t border-gray-500"
               >
                 <LogOut size={18} /> Cerrar sesión
@@ -315,6 +337,7 @@ export default function App() {
               setModalActual={setModalActual}
               setClaseSeleccionada={setClaseSeleccionada}
               actualizador={actualizador}
+              uidProfesor={usuario.uid}
             />
           )}
 
@@ -524,12 +547,23 @@ export default function App() {
       )}
 
       {/* ================= MODALES ================= */}
-      {modalActual === 'CambiarContrasena' && (
-        <ModalCambiarContrasena setModalActual={setModalActual} />
+      {(modalActual === 'CambiarContrasena' || usuario.cambioContrasenaPendiente) && (
+        <ModalCambiarContrasena
+          setModalActual={setModalActual}
+          obligatorio={usuario.cambioContrasenaPendiente}
+          onActualizarContrasena={({ actual, nueva }) =>
+            cambiarContrasena({ correo: usuario.correo, actual, nueva })
+          }
+          onCompletado={() => setUsuario((u) => ({ ...u, cambioContrasenaPendiente: false }))}
+        />
       )}
 
       {modalActual === 'CrearClase' && (
-        <ModalCrearClase setModalActual={setModalActual} onActualizacion={forzarActualizacion} />
+        <ModalCrearClase
+          setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
+          uidProfesor={usuario.uid}
+        />
       )}
 
       {modalActual === 'EditarClase' && (
@@ -593,40 +627,6 @@ export default function App() {
         />
       )}
 
-      {/* Barra Flotante de Pruebas Rápidas (Profesor / Alumno por No. Control) */}
-      <div className="fixed bottom-4 left-4 bg-[#2e4578] text-white p-3 rounded-xl shadow-2xl z-50 flex flex-wrap items-center gap-2 text-[12pt] border border-blue-300">
-        <span className="font-bold mr-1">Pruebas:</span>
-        <button
-          onClick={() => {
-            setUsuario({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
-            setVistaActual('PantallaPrincipal');
-          }}
-          className="bg-blue-500 px-2.5 py-1 rounded font-bold hover:bg-blue-600"
-        >
-          Prof: Inicio
-        </button>
-        <input
-          type="text"
-          value={noControlPrueba}
-          onChange={(e) => setNoControlPrueba(e.target.value)}
-          placeholder="No. Control"
-          className="w-28 px-2 py-1 rounded text-black font-semibold text-[11pt]"
-          title="Número de control del alumno inscrito en la clase"
-        />
-        <button
-          onClick={() => {
-            setUsuario({
-              no_control: noControlPrueba.trim(),
-              correo: `l${noControlPrueba.trim()}@chilpancingo.tecnm.mx`,
-              rol: 'Alumno'
-            });
-            setVistaActual('PantallaClasesAlumno');
-          }}
-          className="bg-emerald-600 px-2.5 py-1 rounded font-bold hover:bg-emerald-700"
-        >
-          Entrar Alumno
-        </button>
-      </div>
     </div>
   );
 }

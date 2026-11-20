@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
 import { theme } from '../theme';
+import { iniciarSesion } from '../services/authService';
 
 export default function PantallaLogin({ onLoginExitoso, mensajeInactividad = '' }) {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [errorModal, setErrorModal] = useState(mensajeInactividad);
+  const [cargando, setCargando] = useState(false);
 
-  const handleSubmit = (e) => {
+  // C.U.14 Pasos 2-6, FA_01 y FA_02
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!correo.trim() || !contrasena.trim()) {
       setErrorModal('El correo y la contraseña son obligatorios');
       return;
     }
-    // Simulación temporal para navegar mientras los operativos conectan Supabase Auth
-    if (onLoginExitoso) {
-      const rolDetectado = correo.toLowerCase().includes('alumno') ? 'Alumno' : 'Profesor';
-      onLoginExitoso({ correo, rol: rolDetectado });
+    setCargando(true);
+    try {
+      const usuario = await iniciarSesion(correo, contrasena);
+      if (onLoginExitoso) onLoginExitoso(usuario);
+    } catch (err) {
+      setContrasena('');
+      setErrorModal(err.message || 'Correo o contraseña incorrectos');
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -70,9 +78,10 @@ export default function PantallaLogin({ onLoginExitoso, mensajeInactividad = '' 
 
             <button
               type="submit"
-              className={`${theme.bgPrimario} ${theme.textPrimario} py-3 rounded-lg text-[16pt] font-bold hover:bg-[#2e4578] transition mt-4 ${theme.font}`}
+              disabled={cargando}
+              className={`${theme.bgPrimario} ${theme.textPrimario} py-3 rounded-lg text-[16pt] font-bold hover:bg-[#2e4578] transition mt-4 disabled:opacity-60 ${theme.font}`}
             >
-              Iniciar sesión
+              {cargando ? 'Verificando...' : 'Iniciar sesión'}
             </button>
           </form>
         </div>

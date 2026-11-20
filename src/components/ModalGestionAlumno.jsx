@@ -4,6 +4,8 @@ import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
 import { sacarAlumnoDeEquipoPorInscripcion } from '../services/equiposService';
 
+const esEditarFn = (accion) => accion === 'EditarAlumno';
+
 export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActualizacion }) => {
   const alumnoData = alumnoItem?.alumno || {};
   const [noControl, setNoControl] = useState('');
@@ -14,6 +16,13 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState(false);
+  const [noControlOriginal, setNoControlOriginal] = useState('');
+  const [avisoCorreo, setAvisoCorreo] = useState(''); // RF009: confirmación del nuevo correo de acceso
+
+  // RF009: el correo institucional se deriva del número de control (RF007)
+  const correoPara = (nc) => `l${nc.trim().toLowerCase()}@chilpancingo.tecnm.mx`;
+  const noControlCambio =
+    esEditarFn(accion) && noControl.trim().toUpperCase() !== noControlOriginal.trim().toUpperCase();
 
   const esEditar = accion === 'EditarAlumno';
   const esEliminar = accion === 'EliminarAlumno';
@@ -23,18 +32,29 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
     if (alumnoData) {
       const control = alumnoData.no_control || '';
       setNoControl(control);
+      setNoControlOriginal(control);
       setNombre(alumnoData.nombre || '');
       setApPaterno(alumnoData.apellido_paterno || '');
       setApMaterno(alumnoData.apellido_materno || '');
       // Muestra el correo existente o genera el institucional automáticamente
-      setCorreo(alumnoData.correo || (control ? `${control}@chilpancingo.itch.mx` : ''));
+      setCorreo(alumnoData.correo || (control ? correoPara(control) : ''));
     }
   }, [alumnoItem]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setCargando(true);
     setError('');
+
+    // RF009: antes de guardar, avisar del cambio de correo de acceso
+    if (esEditar && noControlCambio && !avisoCorreo) {
+      if (!/^([A-Za-z]\d{8}|\d{8})$/.test(noControl.trim())) {
+        setError('El número de control no tiene un formato válido');
+        return;
+      }
+      setAvisoCorreo(correoPara(noControl));
+      return;
+    }
+    setCargando(true);
 
     try {
       if (esEliminar) {
@@ -56,22 +76,20 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
         // RF011: al reactivarse queda sin equipo
         await sacarAlumnoDeEquipoPorInscripcion(alumnoItem.id_inscripcion);
       } else if (esEditar) {
-        if (!nombre.trim() || !apPaterno.trim()) {
-          throw new Error('Nombre y Apellido Paterno son obligatorios');
+        if (!noControl.trim() || !nombre.trim() || !apPaterno.trim()) {
+          throw new Error('El número de control, el nombre y el apellido paterno son obligatorios');
         }
 
-        const correoAGuardar = correo.trim() || `${noControl.trim()}@chilpancingo.itch.mx`;
-
-        const { error: dbError } = await supabase
-          .from('alumno')
-          .update({
-            nombre: nombre.trim(),
-            apellido_paterno: apPaterno.trim(),
-            apellido_materno: apMaterno.trim(),
-            correo: correoAGuardar
-          })
-          .eq('no_control', noControl);
-        if (dbError) throw dbError;
+        // RF009: actualiza datos (y, si cambió el no. de control, historial + correo de acceso) en una transacción
+        const { data: correoFinal, error: dbError } = await supabase.rpc('actualizar_alumno', {
+          p_no_control_actual: noControlOriginal,
+          p_no_control_nuevo: noControl.trim(),
+          p_nombre: nombre.trim(),
+          p_apellido_paterno: apPaterno.trim(),
+          p_apellido_materno: apMaterno.trim()
+        });
+        if (dbError) throw new Error(dbError.message);
+        if (correoFinal) setCorreo(correoFinal);
       }
 
       // Mostrar mensaje de confirmación antes de cerrar (CP-0005)[cite: 14]
@@ -83,6 +101,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
 
     } catch (err) {
       setError(err.message);
+      setAvisoCorreo('');
       setCargando(false);
     }
   };
@@ -130,8 +149,13 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
             <input
               type="text"
               value={noControl}
-              disabled
-              className="w-full p-2 border border-gray-300 rounded bg-gray-100 text-center text-[14pt] font-bold text-gray-600"
+              onChange={(e) => {
+                setNoControl(e.target.value);
+                setAvisoCorreo('');
+              }}
+              disabled={!esEditar}
+              maxLength={9}
+              className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] font-bold ${!esEditar ? 'bg-gray-100 text-gray-600' : 'bg-white'}`}
             />
           </div>
 
@@ -173,12 +197,18 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
             <label className={`text-[13pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Correo Institucional:</label>
             <input
               type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              disabled={!esEditar}
-              className={`w-full p-2 border border-gray-400 rounded text-center text-[14pt] ${!esEditar ? 'bg-gray-100' : 'bg-white'}`}
+              value={noControlCambio ? correoPara(noControl) : correo}
+              disabled
+              className="w-full p-2 border border-gray-300 rounded text-center text-[14pt] bg-gray-100 text-gray-600"
             />
           </div>
+
+          {avisoCorreo && !exito && (
+            <div className="bg-yellow-100 text-yellow-900 border border-yellow-400 p-3 rounded text-center text-[13pt] font-semibold">
+              El correo de acceso del alumno cambiará a {avisoCorreo}
+              <div className="text-[12pt] font-normal mt-1">Su contraseña no cambia. Presiona "Confirmar" para guardar.</div>
+            </div>
+          )}
 
           <div className="flex justify-center gap-4 mt-4">
              {/* Botón Cancelar requerido por C.U.3 FA_02[cite: 14] */}
@@ -195,7 +225,7 @@ export const ModalGestionAlumno = ({ accion, alumnoItem, setModalActual, onActua
                 disabled={cargando || exito}
                 className={`${getColorBoton()} ${theme.textPrimario} text-[15pt] font-bold py-2 px-6 rounded ${theme.font} transition disabled:opacity-50`}
              >
-                {cargando ? 'Procesando...' : (esEliminar ? 'Dar de Baja' : esReactivar ? 'Reactivar Alumno' : 'Guardar Cambios')}
+                {cargando ? 'Procesando...' : (esEliminar ? 'Dar de Baja' : esReactivar ? 'Reactivar Alumno' : avisoCorreo ? 'Confirmar' : 'Guardar Cambios')}
              </button>
           </div>
         </form>

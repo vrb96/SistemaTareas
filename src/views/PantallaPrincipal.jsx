@@ -5,7 +5,7 @@ import { supabase } from '../supa/supabaseClient';
 import iconoEliminar from '../assets/eliminar.svg';
 import iconoEditar from '../assets/editar.svg';
 
-export default function PantallaPrincipal({ setVistaActual, setModalActual, setClaseSeleccionada, actualizador }) {
+export default function PantallaPrincipal({ setVistaActual, setModalActual, setClaseSeleccionada, actualizador, uidProfesor }) {
   const [clases, setClases] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -15,6 +15,7 @@ export default function PantallaPrincipal({ setVistaActual, setModalActual, setC
       const { data, error } = await supabase
         .from('clase')
         .select('*')
+        .eq('uid_profesor', uidProfesor)
         .eq('estado_activacion', true);
 
       if (!error && data) {
@@ -23,7 +24,7 @@ export default function PantallaPrincipal({ setVistaActual, setModalActual, setC
       setCargando(false);
     };
     cargarClases();
-  }, [actualizador]);
+  }, [actualizador, uidProfesor]);
 
   return (
     <div className="p-8">
