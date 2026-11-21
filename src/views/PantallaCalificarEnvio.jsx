@@ -53,8 +53,11 @@ export default function PantallaCalificarEnvio({
       return;
     }
 
-    if (onGuardarCalificacion) {
-      await onGuardarCalificacion(num);
+    try {
+      if (onGuardarCalificacion) await onGuardarCalificacion(num);
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo guardar la calificación' });
+      return;
     }
     setEditandoCalif(false);
     setAlerta({ tipo: 'exito', mensaje: 'Calificación registrada con éxito' });
@@ -71,12 +74,17 @@ export default function PantallaCalificarEnvio({
       return;
     }
 
-    const item = {
+    let item = {
       id: Date.now(),
       fecha: new Date().toLocaleString('es-MX'),
       texto: limpio
     };
-    if (onGuardarComentario) await onGuardarComentario(item);
+    try {
+      if (onGuardarComentario) item = (await onGuardarComentario(item)) || item;
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo guardar el comentario' });
+      return;
+    }
     setComentarios([...comentarios, item]);
     setNuevoComentario('');
   };
@@ -90,14 +98,25 @@ export default function PantallaCalificarEnvio({
       });
       return;
     }
-    if (onEditarComentario) await onEditarComentario(id, limpio);
+    try {
+      if (onEditarComentario) await onEditarComentario(id, limpio);
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo editar el comentario' });
+      return;
+    }
     setComentarios(comentarios.map((c) => (c.id === id ? { ...c, texto: limpio } : c)));
     setEditandoId(null);
   };
 
   const confirmarEliminarComentario = async () => {
     if (!comentarioAEliminar) return;
-    if (onEliminarComentario) await onEliminarComentario(comentarioAEliminar.id);
+    try {
+      if (onEliminarComentario) await onEliminarComentario(comentarioAEliminar.id);
+    } catch (err) {
+      setComentarioAEliminar(null);
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo eliminar el comentario' });
+      return;
+    }
     setComentarios(comentarios.filter((c) => c.id !== comentarioAEliminar.id));
     setComentarioAEliminar(null);
   };
@@ -105,11 +124,26 @@ export default function PantallaCalificarEnvio({
   const handleGuardarExtension = async (e) => {
     e.preventDefault();
     if (!fechaExt || !horaExt) return;
-    if (onGuardarExtension) {
-      await onGuardarExtension({
-        fecha_hora_limite_ext: `${fechaExt}T${horaExt}:00`,
-        fecha_hora_cierre_ext: fechaCierreExt ? `${fechaCierreExt}T${horaCierreExt}:00` : null
-      });
+    const limite = new Date(`${fechaExt}T${horaExt}:00`);
+    const cierre = fechaCierreExt ? new Date(`${fechaCierreExt}T${horaCierreExt}:00`) : null;
+    if (limite <= new Date()) {
+      setAlerta({ tipo: 'error', mensaje: 'La fecha límite extendida debe ser posterior al momento actual' });
+      return;
+    }
+    if (cierre && cierre < limite) {
+      setAlerta({ tipo: 'error', mensaje: 'La fecha de cierre no puede ser anterior a la fecha límite extendida' });
+      return;
+    }
+    try {
+      if (onGuardarExtension) {
+        await onGuardarExtension({
+          fecha_hora_limite_ext: `${fechaExt}T${horaExt}:00`,
+          fecha_hora_cierre_ext: cierre ? `${fechaCierreExt}T${horaCierreExt}:00` : null
+        });
+      }
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo otorgar la extensión' });
+      return;
     }
     setModalExtension(false);
     setAlerta({ tipo: 'exito', mensaje: 'Permiso de extensión otorgado con éxito' });

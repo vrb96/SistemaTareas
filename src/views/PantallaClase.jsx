@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, UserCheck } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { sacarAlumnoDeEquipoPorInscripcion } from '../services/equiposService';
 import iconoEliminar from '../assets/eliminar.svg';
 import iconoEditar from '../assets/editar.svg';
 
@@ -45,6 +46,14 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
       .from('inscripcion_clase')
       .update({ participacion: nuevoValor })
       .eq('id_inscripcion', idInscripcion);
+    // RF012: al cambiar a No participa sale del equipo al que pertenezca
+    if (nuevoValor !== 'Si') {
+      try {
+        await sacarAlumnoDeEquipoPorInscripcion(idInscripcion);
+      } catch (err) {
+        console.error('Error al sacar al alumno de su equipo:', err);
+      }
+    }
     cargarAlumnos();
   };
 
@@ -72,12 +81,6 @@ export default function PantallaClase({ setVistaActual, setModalActual, claseAct
           className={`bg-gray-400 text-white py-2 rounded text-[16pt] font-bold text-center hover:bg-[#465d91] transition ${theme.font}`}
         >
           Asignaciones
-        </button>
-        <button
-          onClick={() => setVistaActual('PantallaEquipos')}
-          className={`${theme.bgContenedor} ${theme.textContenedor} py-2 rounded text-[16pt] font-bold text-center hover:bg-blue-200 ${theme.font}`}
-        >
-          Equipos
         </button>
       </div>
 

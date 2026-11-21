@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { validarClase } from '../validaciones';
 
-export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
+export const ModalCrearClase = ({ setModalActual, onActualizacion, uidProfesor }) => {
   const [nombre, setNombre] = useState('');
   const [clave, setClave] = useState('');
   const [grupo, setGrupo] = useState('');
@@ -20,18 +21,10 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
     setCargando(true);
 
     // 1. Validaciones obligatorias (CP-0001)[cite: 101]
-    if (!nombre.trim() || !clave.trim() || !grupo.trim() || !anio.trim()) {
-      setError('Faltan datos obligatorios por registrar');
-      setCargando(false);
-      return;
-    }
-    if (nombre.trim().length < 3 || nombre.trim().length > 100) {
-      setError('El nombre debe tener entre 3 y 100 caracteres');
-      setCargando(false);
-      return;
-    }
-    if (!/^\d{4}$/.test(anio.trim()) || parseInt(anio.trim()) < 0) {
-      setError('El año escolar debe ser un número positivo de exactamente 4 dígitos');
+    // RF001: nombre 3–50, clave 1–20, grupo 1–10, periodo de la lista y año de 4 dígitos
+    const errorValidacion = validarClase({ nombre, clave, grupo, periodo, anio });
+    if (errorValidacion) {
+      setError(errorValidacion);
       setCargando(false);
       return;
     }
@@ -43,7 +36,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
       const { data: clasesDuplicadas, error: searchError } = await supabase
         .from('clase')
         .select('id_clase')
-        .eq('uid_profesor', 'profesor-de-prueba-id')
+        .eq('uid_profesor', uidProfesor)
         .eq('clave', clave.trim())
         .eq('grupo', grupo.trim())
         .eq('periodo_escolar', periodoEscolar)
@@ -59,7 +52,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
       const { error: insertError } = await supabase
         .from('clase')
         .insert([{
-          uid_profesor: 'profesor-de-prueba-id',
+          uid_profesor: uidProfesor,
           nombre: nombre.trim(),
           clave: clave.trim(),
           grupo: grupo.trim(),
@@ -112,7 +105,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
             <input 
               type="text" 
               value={nombre} 
-              onChange={(e) => setNombre(e.target.value)} 
+              onChange={(e) => setNombre(e.target.value)} maxLength={50} 
               placeholder="Ej. Gestión de Proyectos" 
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
             />
@@ -122,7 +115,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
             <input 
               type="text" 
               value={clave} 
-              onChange={(e) => setClave(e.target.value)} 
+              onChange={(e) => setClave(e.target.value)} maxLength={20} 
               placeholder="Ej. GP-1" 
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
             />
@@ -132,7 +125,7 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
             <input 
               type="text" 
               value={grupo} 
-              onChange={(e) => setGrupo(e.target.value)} 
+              onChange={(e) => setGrupo(e.target.value)} maxLength={10} 
               placeholder="Ej. 7A" 
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" 
             />
@@ -146,7 +139,6 @@ export const ModalCrearClase = ({ setModalActual, onActualizacion }) => {
                 className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
               >
                 <option value="Enero-Junio">Enero-Junio</option>
-                <option value="Verano">Verano</option>
                 <option value="Agosto-Diciembre">Agosto-Diciembre</option>
               </select>
             </div>

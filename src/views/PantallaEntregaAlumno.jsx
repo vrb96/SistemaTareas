@@ -69,17 +69,23 @@ export default function PantallaEntregaAlumno({
       return;
     }
 
-    if (onEnviarArchivo) {
-      await onEnviarArchivo(archivoActual);
+    try {
+      if (onEnviarArchivo) {
+        await onEnviarArchivo(archivoActual);
+      }
+      const ahora = new Date().toLocaleString('es-MX');
+      setFechaEnvio(ahora);
+      setEstadoEnvio('Enviado');
+      setAlertaModal({
+        tipo: 'exito',
+        mensaje: 'Archivo enviado con éxito'
+      });
+    } catch (err) {
+      setAlertaModal({
+        tipo: 'error',
+        mensaje: err.message || 'Ocurrió un error al enviar el archivo.'
+      });
     }
-
-    const ahora = new Date().toLocaleString('es-MX');
-    setFechaEnvio(ahora);
-    setEstadoEnvio('Enviado');
-    setAlertaModal({
-      tipo: 'exito',
-      mensaje: 'Archivo enviado con éxito'
-    });
   };
 
   // C.U.10 FA_01: Confirmar deshacer envío
@@ -94,15 +100,21 @@ export default function PantallaEntregaAlumno({
       return;
     }
 
-    if (onDeshacerEnvio) {
-      await onDeshacerEnvio();
+    try {
+      if (onDeshacerEnvio) {
+        await onDeshacerEnvio();
+      }
+      setEstadoEnvio('Sin enviar');
+      setAlertaModal({
+        tipo: 'exito',
+        mensaje: 'Envío deshecho con éxito'
+      });
+    } catch (err) {
+      setAlertaModal({
+        tipo: 'error',
+        mensaje: err.message || 'No se pudo deshacer el envío.'
+      });
     }
-
-    setEstadoEnvio('Sin enviar');
-    setAlertaModal({
-      tipo: 'exito',
-      mensaje: 'Envío deshecho con éxito'
-    });
   };
 
   return (

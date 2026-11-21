@@ -2,14 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Users, KeyRound, LogOut } from 'lucide-react';
 import { theme } from './theme';
 
-// Servicio de consultas del Alumno (C.U.9)
-import {
-  obtenerClasesAlumno,
-  obtenerAsignacionesClase,
-  obtenerEntregasAlumno,
-  obtenerEquipoAlumnoEnClase
-} from './services/alumnoConsultaService';
-
 // Vistas Iteración 1 (Profesor)
 import PantallaPrincipal from './views/PantallaPrincipal';
 import PantallaClase from './views/PantallaClase';
@@ -25,7 +17,7 @@ import { ModalGestionAlumno } from './components/ModalGestionAlumno';
 import { ModalAsignacion } from './components/ModalAsignacion';
 import { ModalEntrega } from './components/ModalEntrega';
 
-// Vistas y Modales Iteración 2 (C.U.9 - C.U.14)
+// Vistas y Modales Iteración 2
 import PantallaLogin from './views/PantallaLogin';
 import ModalCambiarContrasena from './components/ModalCambiarContrasena';
 import PantallaClasesAlumno from './views/PantallaClasesAlumno';
@@ -36,74 +28,58 @@ import PantallaEnviosEntrega from './views/PantallaEnviosEntrega';
 import PantallaCalificarEnvio from './views/PantallaCalificarEnvio';
 import PantallaEquipos from './views/PantallaEquipos';
 
-// Datos simulados para las vistas del Profesor pendientes de conectar por los operativos (C.U.11 - C.U.13)
-const MOCK_ENVIOS_PROFESOR = [
-  {
-    id_alumno: 1,
-    no_control: '22520266',
-    nombre_completo: 'Abelino Chana Carlos Rigoberto',
-    estado_envio: 'Enviado',
-    fecha_hora_envio: '2026-11-18 08:40',
-    nombre_archivo: 'SRS_Iteracion2_Carlos.docx',
-    calificacion: 92
-  },
-  {
-    id_alumno: 2,
-    no_control: '22520229',
-    nombre_completo: 'Alarcón Monroy Samuel David',
-    estado_envio: 'Sin enviar',
-    fecha_hora_envio: null,
-    nombre_archivo: null,
-    calificacion: null
-  },
-  {
-    id_alumno: 3,
-    no_control: '22520191',
-    nombre_completo: 'Armenta Ortega Jorge Armando',
-    estado_envio: 'Enviado',
-    fecha_hora_envio: '2026-11-18 09:10',
-    nombre_archivo: 'SRS_Iteracion2_Jorge.pdf',
-    calificacion: null
-  }
-];
+// Servicios reales (Iteración 2)
+import {
+  obtenerClasesAlumno,
+  obtenerAsignacionesClase,
+  obtenerEntregasAlumno,
+  obtenerEquipoAlumnoEnAsignacion
+} from './services/alumnoConsultaService';
+import {
+  enviarArchivoEntrega,
+  deshacerEnvioEntrega,
+  descargarArchivoEnvio
+} from './services/enviosService';
+import {
+  obtenerEnviosDeEntrega,
+  compararEntregaConAnterior
+} from './services/comparadorService';
+import {
+  obtenerComentariosEntrega,
+  guardarCalificacion,
+  otorgarExtensionIndividual,
+  agregarComentario,
+  editarComentario,
+  eliminarComentario
+} from './services/evaluacionesService';
+import {
+  obtenerDatosEquiposAsignacion,
+  guardarEquiposGenerados,
+  actualizarEquipo,
+  eliminarEquipo
+} from './services/equiposService';
+import { obtenerSesionActual, cerrarSesion, cambiarContrasena } from './services/authService';
 
-const MOCK_COMPARACION = {
-  titulo: 'Comparado contra Entrega 1',
-  omitidas: [],
-  sinCambios: false,
-  parrafos: [
-    {
-      tokens: [
-        { tipo: 'igual', texto: 'El sistema web permitirá a los docentes' },
-        { tipo: 'eliminado', texto: 'registrar materias manualmente' },
-        { tipo: 'agregado', texto: 'gestionar múltiples asignaturas y equipos equitativos' },
-        { tipo: 'igual', texto: 'con cierre automático por fecha límite.' }
-      ]
-    }
-  ]
-};
+// Helper para extraer el número de entrega (1, 2, 3...) desde "Entrega 2" o la lista
+function obtenerNumeroEntrega(entrega, listaEntregas = []) {
+  if (!entrega) return 1;
+  if (entrega.no_entrega) return Number(entrega.no_entrega);
+  const match = String(entrega.numero_entrega || '').match(/\d+/);
+  if (match) return Number(match[0]);
+  const idx = listaEntregas.findIndex((e) => e.id_entrega === entrega.id_entrega);
+  return idx >= 0 ? idx + 1 : 1;
+}
 
-const MOCK_EQUIPOS = [
-  {
-    id: 1,
-    nombre: 'Equipo 1',
-    integrantes: [
-      { id_alumno: 1, no_control: '22520266', nombre_completo: 'Abelino Chana Carlos Rigoberto' },
-      { id_alumno: 2, no_control: '22520229', nombre_completo: 'Alarcón Monroy Samuel David' }
-    ]
-  }
-];
-
-const MOCK_ELEGIBLES = [
-  { id_alumno: 3, no_control: '22520191', nombre_completo: 'Armenta Ortega Jorge Armando' },
-  { id_alumno: 4, no_control: '22520230', nombre_completo: 'Barragán Duque José Emmanuel' },
-  { id_alumno: 5, no_control: '23520382', nombre_completo: 'Baños Gutiérrez Maximiliano' },
-  { id_alumno: 6, no_control: '22520401', nombre_completo: 'Guzmán Ramírez Carmen Elizabeth' }
-];
+// Helper para obtener no_control desde usuario.no_control o correo institucional
+function obtenerNoControl(usuario) {
+  if (usuario?.no_control) return usuario.no_control;
+  if (!usuario?.correo) return '';
+  return usuario.correo.split('@')[0].replace(/^l/i, '');
+}
 
 export default function App() {
-  // Sesión (C.U.14)
-  const [usuario, setUsuario] = useState({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
+  const [usuario, setUsuario] = useState(null);
+  const [cargandoSesion, setCargandoSesion] = useState(true);
   const [mensajeInactividad, setMensajeInactividad] = useState('');
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
 
@@ -120,32 +96,65 @@ export default function App() {
   const [entregasDeAsignacion, setEntregasDeAsignacion] = useState([]);
   const [alumnoEnvioSeleccionado, setAlumnoEnvioSeleccionado] = useState(null);
 
-  // Estados Reales Alumno (C.U.9 conectado a Supabase)
+  // Estados reales C.U.11 (Profesor)
+  const [listaEnviosProfesor, setListaEnviosProfesor] = useState([]);
+  const [comparacionActual, setComparacionActual] = useState(null);
+  const [cargandoComparacion, setCargandoComparacion] = useState(false);
+  const [comentariosProfesor, setComentariosProfesor] = useState([]);
+  const [datosEquipos, setDatosEquipos] = useState(null); // C.U.13 { equipos, elegibles, totalAlumnosClase }
+  const [errorEquipos, setErrorEquipos] = useState('');
+
+  // Selecciones y estados reales C.U.9 y C.U.10 (Alumno)
   const [clasesAlumno, setClasesAlumno] = useState([]);
+  const [claseAlumnoSel, setClaseAlumnoSel] = useState(null);
   const [asignacionesAlumno, setAsignacionesAlumno] = useState([]);
+  const [asignacionAlumnoSel, setAsignacionAlumnoSel] = useState(null);
   const [entregasAlumno, setEntregasAlumno] = useState([]);
   const [equipoAlumno, setEquipoAlumno] = useState(null);
-  const [cargandoAlumno, setCargandoAlumno] = useState(false);
-
-  const [claseAlumnoSel, setClaseAlumnoSel] = useState(null);
-  const [asignacionAlumnoSel, setAsignacionAlumnoSel] = useState(null);
   const [entregaAlumnoSel, setEntregaAlumnoSel] = useState(null);
 
   const forzarActualizacion = () => setActualizador((prev) => prev + 1);
 
-  // Obtener número de control desde el correo institucional del alumno
-  const noControlAlumno = usuario?.correo ? usuario.correo.split('@')[0].trim() : '';
-
-  // Cargar clases activas del alumno desde Supabase al cambiar al rol Alumno (C.U.9 Paso 1)
+  // C.U.14: restaurar la sesión guardada de Supabase al recargar la página
   useEffect(() => {
-    if (usuario?.rol === 'Alumno' && noControlAlumno) {
-      setCargandoAlumno(true);
-      obtenerClasesAlumno(noControlAlumno)
-        .then((data) => setClasesAlumno(data))
-        .catch((err) => console.error('Error al cargar clases del alumno:', err))
-        .finally(() => setCargandoAlumno(false));
-    }
-  }, [usuario, noControlAlumno]);
+    obtenerSesionActual()
+      .then((u) => {
+        if (u) {
+          setUsuario(u);
+          setVistaActual(u.rol === 'Alumno' ? 'PantallaClasesAlumno' : 'PantallaPrincipal');
+        }
+      })
+      .finally(() => setCargandoSesion(false));
+  }, []);
+
+  // RF044: cerrar sesión (también la usa el cierre por inactividad)
+  const salirDelSistema = async (mensaje = '') => {
+    await cerrarSesion();
+    setUsuario(null);
+    setMenuUsuarioAbierto(false);
+    setModalActual(null);
+    setVistaActual('PantallaPrincipal');
+    setMensajeInactividad(mensaje);
+  };
+
+  // --- CARGA REAL PROFESOR: C.U.13 (Equipos de la asignación) ---
+  useEffect(() => {
+    if (
+      usuario?.rol !== 'Profesor' ||
+      vistaActual !== 'PantallaEquipos' ||
+      !claseSeleccionada?.id_clase ||
+      !asignacionSeleccionada?.id_asignacion
+    ) return;
+    let cancelado = false;
+    setDatosEquipos(null);
+    setErrorEquipos('');
+    obtenerDatosEquiposAsignacion(claseSeleccionada.id_clase, asignacionSeleccionada.id_asignacion)
+      .then((datos) => !cancelado && setDatosEquipos(datos))
+      .catch((err) => !cancelado && setErrorEquipos(err.message || 'No se pudieron cargar los equipos'));
+    return () => {
+      cancelado = true;
+    };
+  }, [usuario, vistaActual, claseSeleccionada, asignacionSeleccionada]);
 
   // C.U.14 FA_03: Cierre automático tras 30 minutos de inactividad
   useEffect(() => {
@@ -154,23 +163,100 @@ export default function App() {
     const reiniciarTimer = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        setUsuario(null);
-        setMenuUsuarioAbierto(false);
-        setMensajeInactividad('Tu sesión ha expirado por inactividad');
+        salirDelSistema('Tu sesión ha expirado por inactividad');
       }, 30 * 60 * 1000);
     };
-
     const eventos = ['mousemove', 'keydown', 'click', 'scroll'];
     eventos.forEach((ev) => window.addEventListener(ev, reiniciarTimer));
     reiniciarTimer();
-
     return () => {
       clearTimeout(timer);
       eventos.forEach((ev) => window.removeEventListener(ev, reiniciarTimer));
     };
   }, [usuario]);
 
-  // Si no hay sesión, mostrar Login (C.U.14)
+  // --- CARGA REAL ALUMNO (C.U.9 y C.U.10) ---
+  useEffect(() => {
+    if (usuario?.rol !== 'Alumno' || vistaActual !== 'PantallaClasesAlumno') return;
+    const noControl = obtenerNoControl(usuario);
+    if (!noControl) return;
+    obtenerClasesAlumno(noControl)
+      .then(setClasesAlumno)
+      .catch((err) => console.error('Error cargando clases del alumno:', err));
+  }, [usuario, vistaActual, actualizador]);
+
+  useEffect(() => {
+    if (usuario?.rol !== 'Alumno' || vistaActual !== 'PantallaAsignacionesAlumno' || !claseAlumnoSel?.id_clase) return;
+    obtenerAsignacionesClase(claseAlumnoSel.id_clase)
+      .then(setAsignacionesAlumno)
+      .catch((err) => console.error('Error cargando asignaciones:', err));
+  }, [usuario, vistaActual, claseAlumnoSel, actualizador]);
+
+  useEffect(() => {
+    if (
+      usuario?.rol !== 'Alumno' ||
+      vistaActual !== 'PantallaDetalleAsignacionAlumno' ||
+      !asignacionAlumnoSel?.id_asignacion
+    ) return;
+    const noControl = obtenerNoControl(usuario);
+    Promise.all([
+      obtenerEntregasAlumno(asignacionAlumnoSel.id_asignacion, noControl),
+      obtenerEquipoAlumnoEnAsignacion(asignacionAlumnoSel.id_asignacion, noControl)
+    ])
+      .then(([ents, eq]) => {
+        setEntregasAlumno(ents);
+        setEquipoAlumno(eq);
+      })
+      .catch((err) => console.error('Error cargando detalle de asignación:', err));
+  }, [usuario, vistaActual, asignacionAlumnoSel, claseAlumnoSel, actualizador]);
+
+  // --- CARGA REAL PROFESOR: C.U.11 (Lista de envíos) ---
+  useEffect(() => {
+    if (
+      usuario?.rol !== 'Profesor' ||
+      vistaActual !== 'PantallaEnviosEntrega' ||
+      !claseSeleccionada?.id_clase ||
+      !entregaSeleccionada?.id_entrega
+    ) return;
+
+    obtenerEnviosDeEntrega(claseSeleccionada.id_clase, entregaSeleccionada.id_entrega)
+      .then(setListaEnviosProfesor)
+      .catch((err) => console.error('Error cargando envíos de entrega:', err));
+  }, [usuario, vistaActual, claseSeleccionada, entregaSeleccionada, actualizador]);
+
+  // --- CARGA REAL PROFESOR: C.U.11 (Comparador .docx + Comentarios) ---
+  useEffect(() => {
+    if (
+      usuario?.rol !== 'Profesor' ||
+      vistaActual !== 'PantallaCalificarEnvio' ||
+      !asignacionSeleccionada?.id_asignacion ||
+      !entregaSeleccionada?.id_entrega ||
+      !alumnoEnvioSeleccionado?.no_control
+    ) return;
+
+    setCargandoComparacion(true);
+    setComparacionActual(null);
+
+    Promise.all([
+      compararEntregaConAnterior({
+        idAsignacion: asignacionSeleccionada.id_asignacion,
+        idEntregaActual: entregaSeleccionada.id_entrega,
+        noControl: alumnoEnvioSeleccionado.no_control
+      }),
+      obtenerComentariosEntrega(entregaSeleccionada.id_entrega, alumnoEnvioSeleccionado.no_control)
+    ])
+      .then(([comp, coms]) => {
+        setComparacionActual(comp);
+        setComentariosProfesor(coms);
+      })
+      .catch((err) => console.error('Error ejecutando comparador:', err))
+      .finally(() => setCargandoComparacion(false));
+  }, [usuario, vistaActual, asignacionSeleccionada, entregaSeleccionada, alumnoEnvioSeleccionado]);
+
+  if (cargandoSesion) {
+    return <div className="min-h-screen flex items-center justify-center text-[16pt] text-gray-600">Cargando...</div>;
+  }
+
   if (!usuario) {
     return (
       <PantallaLogin
@@ -184,9 +270,21 @@ export default function App() {
     );
   }
 
+  // Objeto entrega normalizado para PantallaEnviosEntrega y PantallaCalificarEnvio
+  const entregaNormalizada = entregaSeleccionada
+    ? {
+        ...entregaSeleccionada,
+        no_entrega: obtenerNumeroEntrega(entregaSeleccionada, entregasDeAsignacion),
+        fecha_hora_limite:
+          entregaSeleccionada.fecha_hora_limite ||
+          `${entregaSeleccionada.fecha_limite || ''} ${entregaSeleccionada.hora_limite?.slice(0, 5) || ''}`.trim(),
+        estado_cierre: entregaSeleccionada.estado_cierre ? 'Cerrada' : 'Abierta'
+      }
+    : null;
+
   return (
     <div className={`${theme.bgSuperficie} min-h-screen relative`}>
-      {/* Barra Superior Institucional con Menú de Usuario (C.U.14) */}
+      {/* Barra Superior */}
       <div className="flex justify-between items-center p-4 border-b border-gray-300 bg-white">
         <div
           onClick={() =>
@@ -223,10 +321,7 @@ export default function App() {
                 <KeyRound size={18} /> Cambiar contraseña
               </button>
               <button
-                onClick={() => {
-                  setMenuUsuarioAbierto(false);
-                  setUsuario(null);
-                }}
+                onClick={() => salirDelSistema()}
                 className="w-full text-left px-4 py-2.5 hover:bg-gray-600 flex items-center gap-2 border-t border-gray-500"
               >
                 <LogOut size={18} /> Cerrar sesión
@@ -245,6 +340,7 @@ export default function App() {
               setModalActual={setModalActual}
               setClaseSeleccionada={setClaseSeleccionada}
               actualizador={actualizador}
+              uidProfesor={usuario.uid}
             />
           )}
 
@@ -281,8 +377,8 @@ export default function App() {
 
           {vistaActual === 'PantallaEnviosEntrega' && (
             <PantallaEnviosEntrega
-              entregaActual={entregaSeleccionada || { no_entrega: 2, fecha_hora_limite: '2026-11-28 23:59' }}
-              listaAlumnosEnvios={MOCK_ENVIOS_PROFESOR}
+              entregaActual={entregaNormalizada}
+              listaAlumnosEnvios={listaEnviosProfesor}
               onVolver={() => setVistaActual('PantallaEntregas')}
               onSeleccionarAlumno={(al) => {
                 setAlumnoEnvioSeleccionado(al);
@@ -293,48 +389,115 @@ export default function App() {
 
           {vistaActual === 'PantallaCalificarEnvio' && (
             <PantallaCalificarEnvio
-              entregaActual={entregaSeleccionada || { no_entrega: 2, fecha_hora_limite: '2026-11-28 23:59' }}
-              alumnoEnvio={alumnoEnvioSeleccionado || MOCK_ENVIOS_PROFESOR[0]}
-              comparacion={MOCK_COMPARACION}
-              comentariosIniciales={[
-                { id: 1, fecha: '18/11/2026 09:30', texto: 'Buen avance en el diagrama de dominio.' }
-              ]}
+              key={`${entregaNormalizada?.id_entrega}-${alumnoEnvioSeleccionado?.no_control}`}
+              entregaActual={entregaNormalizada}
+              alumnoEnvio={alumnoEnvioSeleccionado}
+              comparacion={
+                cargandoComparacion
+                  ? { titulo: 'Analizando documentos .docx...', omitidas: [], parrafos: [] }
+                  : comparacionActual
+              }
+              comentariosIniciales={comentariosProfesor}
               onVolver={() => setVistaActual('PantallaEnviosEntrega')}
-              onDescargarArchivo={(al) => alert(`Descargando ${al.nombre_archivo}...`)}
+              onDescargarArchivo={async (al) => {
+                try {
+                  await descargarArchivoEnvio(al.ruta_storage, al.nombre_archivo);
+                } catch (err) {
+                  alert(err.message);
+                }
+              }}
+              onGuardarCalificacion={async (calificacion) => {
+                await guardarCalificacion({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  calificacion
+                });
+                forzarActualizacion();
+              }}
+              onGuardarExtension={({ fecha_hora_limite_ext, fecha_hora_cierre_ext }) =>
+                otorgarExtensionIndividual({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  uidProfesor: usuario?.uid ?? null,
+                  fecha_hora_limite_ext,
+                  fecha_hora_cierre_ext
+                })
+              }
+              onGuardarComentario={(item) =>
+                agregarComentario({
+                  idEntrega: entregaSeleccionada.id_entrega,
+                  noControl: alumnoEnvioSeleccionado.no_control,
+                  uidProfesor: usuario?.uid ?? null,
+                  texto: item.texto
+                })
+              }
+              onEditarComentario={(id, texto) => editarComentario(id, texto)}
+              onEliminarComentario={(id) => eliminarComentario(id)}
             />
           )}
 
-          {vistaActual === 'PantallaEquipos' && (
+          {vistaActual === 'PantallaEquipos' && !datosEquipos && (
+            <div className="p-8 text-[16pt] text-gray-600">
+              {errorEquipos || 'Cargando equipos...'}
+            </div>
+          )}
+
+          {vistaActual === 'PantallaEquipos' && datosEquipos && (
             <PantallaEquipos
-              equiposIniciales={MOCK_EQUIPOS}
-              alumnosElegiblesIniciales={MOCK_ELEGIBLES}
-              totalAlumnosClase={6}
-              onVolver={() => setVistaActual('PantallaClase')}
+              key={asignacionSeleccionada?.id_asignacion}
+              tituloAsignacion={asignacionSeleccionada?.titulo}
+              equiposIniciales={datosEquipos.equipos}
+              alumnosElegiblesIniciales={datosEquipos.elegibles}
+              totalAlumnosClase={datosEquipos.totalAlumnosClase}
+              onVolver={() => setVistaActual('PantallaEntregas')}
+              onGuardarEquiposGenerados={async (propuestos) => {
+                const idClase = claseSeleccionada.id_clase;
+                const idAsig = asignacionSeleccionada.id_asignacion;
+                await guardarEquiposGenerados(idClase, idAsig, propuestos);
+                return obtenerDatosEquiposAsignacion(idClase, idAsig);
+              }}
+              onActualizarEquipo={async (editado, movidos = []) => {
+                const idClase = claseSeleccionada.id_clase;
+                const idAsig = asignacionSeleccionada.id_asignacion;
+                // 1) Guardar el equipo editado (nombre e integrantes; los movidos ya no están en él)
+                await actualizarEquipo(idAsig, editado);
+                // 2) Agregar los integrantes movidos a sus equipos destino
+                const actuales = await obtenerDatosEquiposAsignacion(idClase, idAsig);
+                const destinos = [...new Set(movidos.map((m) => String(m.destinoId)))];
+                for (const idDestino of destinos) {
+                  const destino = actuales.equipos.find((eq) => String(eq.id) === idDestino);
+                  if (!destino) continue;
+                  const llegan = movidos
+                    .filter((m) => String(m.destinoId) === idDestino)
+                    .map((m) => ({ ...m.alumno, rol_equipo: 'Integrante' }));
+                  await actualizarEquipo(idAsig, {
+                    ...destino,
+                    integrantes: [...destino.integrantes, ...llegan]
+                  });
+                }
+                return obtenerDatosEquiposAsignacion(idClase, idAsig);
+              }}
+              onEliminarEquipo={async (idEquipo) => {
+                await eliminarEquipo(idEquipo);
+                return obtenerDatosEquiposAsignacion(
+                  claseSeleccionada.id_clase,
+                  asignacionSeleccionada.id_asignacion
+                );
+              }}
             />
           )}
         </>
       )}
 
-      {/* ================= VISTAS ALUMNO (C.U.9 REAL + C.U.10) ================= */}
+      {/* ================= VISTAS ALUMNO (C.U.9 y C.U.10) ================= */}
       {usuario.rol === 'Alumno' && (
         <>
           {vistaActual === 'PantallaClasesAlumno' && (
             <PantallaClasesAlumno
               clases={clasesAlumno}
-              cargando={cargandoAlumno}
-              onSeleccionarClase={async (clase) => {
+              onSeleccionarClase={(clase) => {
                 setClaseAlumnoSel(clase);
                 setVistaActual('PantallaAsignacionesAlumno');
-                setCargandoAlumno(true);
-                try {
-                  const lista = await obtenerAsignacionesClase(clase.id_clase);
-                  setAsignacionesAlumno(lista);
-                } catch (err) {
-                  console.error('Error al cargar asignaciones:', err);
-                  setAsignacionesAlumno([]);
-                } finally {
-                  setCargandoAlumno(false);
-                }
               }}
             />
           )}
@@ -343,23 +506,10 @@ export default function App() {
             <PantallaAsignacionesAlumno
               claseActual={claseAlumnoSel}
               asignaciones={asignacionesAlumno}
-              cargando={cargandoAlumno}
               onVolver={() => setVistaActual('PantallaClasesAlumno')}
-              onSeleccionarAsignacion={async (asig) => {
+              onSeleccionarAsignacion={(asig) => {
                 setAsignacionAlumnoSel(asig);
                 setVistaActual('PantallaDetalleAsignacionAlumno');
-                try {
-                  const [ents, eq] = await Promise.all([
-                    obtenerEntregasAlumno(asig.id_asignacion, noControlAlumno),
-                    obtenerEquipoAlumnoEnClase(claseAlumnoSel.id_clase, noControlAlumno)
-                  ]);
-                  setEntregasAlumno(ents);
-                  setEquipoAlumno(eq);
-                } catch (err) {
-                  console.error('Error al cargar entregas del alumno:', err);
-                  setEntregasAlumno([]);
-                  setEquipoAlumno(null);
-                }
               }}
             />
           )}
@@ -379,21 +529,51 @@ export default function App() {
 
           {vistaActual === 'PantallaEntregaAlumno' && (
             <PantallaEntregaAlumno
+              key={entregaAlumnoSel?.id_entrega}
               entregaActual={entregaAlumnoSel}
               comentarios={entregaAlumnoSel?.comentarios || []}
-              onVolver={() => setVistaActual('PantallaDetalleAsignacionAlumno')}
+              onVolver={() => {
+                forzarActualizacion();
+                setVistaActual('PantallaDetalleAsignacionAlumno');
+              }}
+              onEnviarArchivo={async (archivo) => {
+                await enviarArchivoEntrega({
+                  idEntrega: entregaAlumnoSel.id_entrega,
+                  noControl: obtenerNoControl(usuario),
+                  archivo
+                });
+                forzarActualizacion();
+              }}
+              onDeshacerEnvio={async () => {
+                await deshacerEnvioEntrega(
+                  entregaAlumnoSel.id_entrega,
+                  obtenerNoControl(usuario)
+                );
+                forzarActualizacion();
+              }}
             />
           )}
         </>
       )}
 
       {/* ================= MODALES ================= */}
-      {modalActual === 'CambiarContrasena' && (
-        <ModalCambiarContrasena setModalActual={setModalActual} />
+      {(modalActual === 'CambiarContrasena' || usuario.cambioContrasenaPendiente) && (
+        <ModalCambiarContrasena
+          setModalActual={setModalActual}
+          obligatorio={usuario.cambioContrasenaPendiente}
+          onActualizarContrasena={({ actual, nueva }) =>
+            cambiarContrasena({ correo: usuario.correo, actual, nueva })
+          }
+          onCompletado={() => setUsuario((u) => ({ ...u, cambioContrasenaPendiente: false }))}
+        />
       )}
 
       {modalActual === 'CrearClase' && (
-        <ModalCrearClase setModalActual={setModalActual} onActualizacion={forzarActualizacion} />
+        <ModalCrearClase
+          setModalActual={setModalActual}
+          onActualizacion={forzarActualizacion}
+          uidProfesor={usuario.uid}
+        />
       )}
 
       {modalActual === 'EditarClase' && (
@@ -457,52 +637,6 @@ export default function App() {
         />
       )}
 
-      {/* Barra Flotante de Pruebas Rápidas */}
-      <div className="fixed bottom-4 left-4 bg-[#2e4578] text-white p-3 rounded-xl shadow-2xl z-50 flex flex-wrap items-center gap-2 text-[12pt] border border-blue-300">
-        <span className="font-bold mr-1">Probar UI:</span>
-        <button
-          onClick={() => setUsuario(null)}
-          className="bg-white text-[#2e4578] px-2.5 py-1 rounded font-bold hover:bg-blue-100"
-        >
-          Login
-        </button>
-        <button
-          onClick={() => {
-            setUsuario({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
-            setVistaActual('PantallaPrincipal');
-          }}
-          className="bg-blue-500 px-2.5 py-1 rounded font-bold hover:bg-blue-600"
-        >
-          Prof: Inicio
-        </button>
-        <button
-          onClick={() => {
-            setUsuario({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
-            setVistaActual('PantallaEquipos');
-          }}
-          className="bg-blue-500 px-2.5 py-1 rounded font-bold hover:bg-blue-600"
-        >
-          Prof: Equipos
-        </button>
-        <button
-          onClick={() => {
-            setUsuario({ correo: 'profesor@chilpancingo.tecnm.mx', rol: 'Profesor' });
-            setVistaActual('PantallaEnviosEntrega');
-          }}
-          className="bg-blue-500 px-2.5 py-1 rounded font-bold hover:bg-blue-600"
-        >
-          Prof: Envíos/Calif
-        </button>
-        <button
-          onClick={() => {
-            setUsuario({ correo: '22520266@chilpancingo.itch.mx', rol: 'Alumno' });
-            setVistaActual('PantallaClasesAlumno');
-          }}
-          className="bg-emerald-600 px-2.5 py-1 rounded font-bold hover:bg-emerald-700"
-        >
-          Alumno (22520266)
-        </button>
-      </div>
     </div>
   );
 }

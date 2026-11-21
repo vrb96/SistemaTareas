@@ -40,6 +40,10 @@ export const ModalEntrega = ({
 
   // Validaciones cronológicas
   const validarFechas = () => {
+    // RF017 / RF018: instrucciones opcionales de hasta 1000 caracteres
+    if (instrucciones.trim().length > 1000) {
+      throw new Error('Las instrucciones no deben superar los 1000 caracteres');
+    }
     const ahora = new Date();
     const fechaHoraIngresada = new Date(`${fechaLimite}T${horaLimite}:00`);
 

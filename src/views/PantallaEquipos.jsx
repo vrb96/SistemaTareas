@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, ChevronLeft } from 'lucide-react';
 import { theme } from '../theme';
+import { generarPropuestaEquiposAleatorios } from '../services/equiposService';
 
 export default function PantallaEquipos({
   equiposIniciales = [],
   alumnosElegiblesIniciales = [],
   totalAlumnosClase = 0,
+  tituloAsignacion = '',
   onVolver,
   onGuardarEquiposGenerados,
   onActualizarEquipo,
@@ -24,6 +26,29 @@ export default function PantallaEquipos({
   const [modalEliminar, setModalEliminar] = useState(false);
   const [confirmarSalir, setConfirmarSalir] = useState(false);
   const [alerta, setAlerta] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  // Edición: integrantes movidos a otros equipos y elegibles antes de editar (para poder cancelar)
+  const [movidos, setMovidos] = useState([]); // [{ alumno, destinoId }]
+  const [elegiblesAntesDeEditar, setElegiblesAntesDeEditar] = useState([]);
+
+  // Los callbacks devuelven los datos frescos de la BD ({ equipos, elegibles })
+  const aplicarDatos = (datos) => {
+    if (!datos) return;
+    setEquipos(datos.equipos);
+    setElegibles(datos.elegibles);
+  };
+
+  const abrirEdicion = (eq) => {
+    setElegiblesAntesDeEditar(elegibles);
+    setMovidos([]);
+    setEquipoEditando({ ...eq, integrantes: [...eq.integrantes] });
+  };
+
+  const cancelarEdicion = () => {
+    setElegibles(elegiblesAntesDeEditar);
+    setMovidos([]);
+    setEquipoEditando(null);
+  };
 
   // C.U.13 Paso 3 y FA_01: Validar alumnos suficientes antes de abrir modal aleatorio
   const iniciarFormacionAleatoria = () => {
@@ -50,28 +75,36 @@ export default function PantallaEquipos({
       return;
     }
 
-    const mezclados = [...elegibles].sort(() => Math.random() - 0.5);
-    const propuestos = [];
-    let numeroInicial = equipos.length + 1;
-
-    for (let i = 0; i < mezclados.length; i += n) {
-      const grupo = mezclados.slice(i, i + n);
-      propuestos.push({
-        id: `temp-${Date.now()}-${i}`,
-        nombre: `Equipo ${numeroInicial++}`,
-        integrantes: grupo
-      });
+    try {
+      setVistaPrevia(
+        generarPropuestaEquiposAleatorios({
+          elegibles,
+          equiposExistentes: equipos,
+          totalAlumnosClase,
+          tamanoEquipo: n
+        })
+      );
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message });
     }
-    setVistaPrevia(propuestos);
   };
 
   const confirmarVistaPrevia = async () => {
     if (!vistaPrevia) return;
-    if (onGuardarEquiposGenerados) {
-      await onGuardarEquiposGenerados(vistaPrevia);
+    setGuardando(true);
+    try {
+      if (onGuardarEquiposGenerados) {
+        aplicarDatos(await onGuardarEquiposGenerados(vistaPrevia));
+      } else {
+        setEquipos([...equipos, ...vistaPrevia]);
+        setElegibles([]);
+      }
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudieron guardar los equipos' });
+      return;
+    } finally {
+      setGuardando(false);
     }
-    setEquipos([...equipos, ...vistaPrevia]);
-    setElegibles([]);
     setVistaPrevia(null);
     setModalFormar(false);
     setAlerta({ tipo: 'exito', mensaje: 'Equipos formados y guardados con éxito' });
@@ -94,11 +127,29 @@ export default function PantallaEquipos({
       return;
     }
 
-    if (onActualizarEquipo) {
-      await onActualizarEquipo(equipoEditando);
+    const editado = { ...equipoEditando, nombre: nombreLimpio };
+    setGuardando(true);
+    try {
+      if (onActualizarEquipo) {
+        aplicarDatos(await onActualizarEquipo(editado, movidos));
+      } else {
+        setEquipos(
+          equipos.map((eq) => {
+            if (eq.id === editado.id) return editado;
+            const llegan = movidos
+              .filter((m) => String(m.destinoId) === String(eq.id))
+              .map((m) => m.alumno);
+            return llegan.length ? { ...eq, integrantes: [...eq.integrantes, ...llegan] } : eq;
+          })
+        );
+      }
+    } catch (err) {
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo actualizar el equipo' });
+      return;
+    } finally {
+      setGuardando(false);
     }
-
-    setEquipos(equipos.map((eq) => (eq.id === equipoEditando.id ? equipoEditando : eq)));
+    setMovidos([]);
     setEquipoEditando(null);
     setAlerta({ tipo: 'exito', mensaje: 'Equipo actualizado con éxito' });
   };
@@ -108,12 +159,18 @@ export default function PantallaEquipos({
     const objetivo = equipos.find((eq) => eq.id === equipoSeleccionadoId);
     if (!objetivo) return;
 
-    if (onEliminarEquipo) {
-      await onEliminarEquipo(objetivo.id);
+    try {
+      if (onEliminarEquipo) {
+        aplicarDatos(await onEliminarEquipo(objetivo.id));
+      } else {
+        setElegibles([...elegibles, ...objetivo.integrantes]);
+        setEquipos(equipos.filter((eq) => eq.id !== objetivo.id));
+      }
+    } catch (err) {
+      setModalEliminar(false);
+      setAlerta({ tipo: 'error', mensaje: err.message || 'No se pudo eliminar el equipo' });
+      return;
     }
-
-    setElegibles([...elegibles, ...objetivo.integrantes]);
-    setEquipos(equipos.filter((eq) => eq.id !== objetivo.id));
     setEquipoSeleccionadoId(null);
     setModalEliminar(false);
     setAlerta({ tipo: 'exito', mensaje: 'Equipo eliminado y alumnos liberados como elegibles' });
@@ -127,7 +184,7 @@ export default function PantallaEquipos({
       <div className="flex h-[calc(100vh-73px)]">
         <div className="w-1/5 border-r-2 border-gray-300 p-4 flex flex-col gap-4 bg-white">
           <button
-            onClick={() => setEquipoEditando(null)}
+            onClick={cancelarEdicion}
             className="text-xl font-bold mb-4 text-left hover:text-red-500"
           >
             <X size={30} />
@@ -161,12 +218,13 @@ export default function PantallaEquipos({
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleGuardarEdicion}
+                disabled={guardando}
                 className="bg-[#465d91] text-white px-8 py-2.5 rounded-lg font-bold text-[16pt] hover:bg-[#2e4578]"
               >
                 Guardar
               </button>
               <button
-                onClick={() => setEquipoEditando(null)}
+                onClick={cancelarEdicion}
                 className="bg-gray-500 text-white px-8 py-2.5 rounded-lg font-bold text-[16pt] hover:bg-gray-600"
               >
                 Cancelar
@@ -214,13 +272,7 @@ export default function PantallaEquipos({
                             (i) => i.id_alumno !== alumno.id_alumno
                           )
                         });
-                        setEquipos(
-                          equipos.map((eq) =>
-                            String(eq.id) === destinoId
-                              ? { ...eq, integrantes: [...eq.integrantes, alumno] }
-                              : eq
-                          )
-                        );
+                        setMovidos([...movidos, { alumno, destinoId }]);
                       }}
                       className="bg-[#dce2f9] text-[#2e4578] px-3 py-1 rounded font-bold text-[13pt]"
                     >
@@ -299,8 +351,11 @@ export default function PantallaEquipos({
           >
             <ChevronLeft size={24} /> Volver
           </button>
-          <h1 className={`text-[28pt] font-bold ${theme.textSuperficie} ${theme.font}`}>
+          <h1 className={`text-[28pt] font-bold text-center ${theme.textSuperficie} ${theme.font}`}>
             Equipos
+            {tituloAsignacion && (
+              <span className="block text-[16pt] font-semibold text-gray-600">{tituloAsignacion}</span>
+            )}
           </h1>
         </div>
 
@@ -370,7 +425,7 @@ export default function PantallaEquipos({
               disabled={!equipoSeleccionadoId}
               onClick={() => {
                 const eq = equipos.find((e) => e.id === equipoSeleccionadoId);
-                if (eq) setEquipoEditando({ ...eq });
+                if (eq) abrirEdicion(eq);
               }}
               className="bg-[#dce2f9] text-[#2e4578] border border-[#465d91] py-3 px-4 rounded-lg font-bold text-[15pt] hover:bg-blue-200 disabled:opacity-40"
             >

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { validarClase } from '../validaciones';
 
 export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualizada }) => {
   const [nombre, setNombre] = useState('');
@@ -36,18 +37,10 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
     setCargando(true);
 
     // 1. Validaciones de longitud (CP-0004)[cite: 16]
-    if (!nombre.trim() || !clave.trim() || !grupo.trim() || !anio.trim()) {
-      setError('Faltan datos obligatorios');
-      setCargando(false);
-      return;
-    }
-    if (nombre.trim().length < 3 || nombre.trim().length > 100) {
-      setError('El nombre debe tener entre 3 y 100 caracteres');
-      setCargando(false);
-      return;
-    }
-    if (!/^\d{4}$/.test(anio.trim()) || parseInt(anio.trim()) < 0) {
-      setError('El año escolar debe ser un número positivo de 4 dígitos');
+    // RF003: mismas validaciones de RF001
+    const errorValidacion = validarClase({ nombre, clave, grupo, periodo, anio });
+    if (errorValidacion) {
+      setError(errorValidacion);
       setCargando(false);
       return;
     }
@@ -135,7 +128,7 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
             <input
               type="text"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => setNombre(e.target.value)} maxLength={50}
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
             />
           </div>
@@ -144,7 +137,7 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
             <input
               type="text"
               value={clave}
-              onChange={(e) => setClave(e.target.value)}
+              onChange={(e) => setClave(e.target.value)} maxLength={20}
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
             />
           </div>
@@ -153,7 +146,7 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
             <input
               type="text"
               value={grupo}
-              onChange={(e) => setGrupo(e.target.value)}
+              onChange={(e) => setGrupo(e.target.value)} maxLength={10}
               className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
             />
           </div>
@@ -166,7 +159,6 @@ export const ModalEditarClase = ({ claseAEditar, setModalActual, onClaseActualiz
                 className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]"
               >
                 <option value="Enero-Junio">Enero-Junio</option>
-                <option value="Verano">Verano</option>
                 <option value="Agosto-Diciembre">Agosto-Diciembre</option>
               </select>
             </div>

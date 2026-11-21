@@ -2,7 +2,9 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, Download, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { crearCuentaAlumno } from '../services/authService';
 import * as XLSX from 'xlsx';
+import { validarNoControl, validarDatosAlumno } from '../validaciones';
 
 // Variable global para compartir resultados entre ventanas
 let resumenCarga = { nuevos: [], inscritosExistentes: 0, reactivados: 0, omitidos: 0, rechazados: [], total: 0 };
@@ -32,7 +34,7 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
   const procesarArchivo = async () => {
     if (!archivoSeleccionado) return;
 
-    if (!archivoSeleccionado.name.endsWith('.xlsx')) {
+    if (!archivoSeleccionado.name.toLowerCase().endsWith('.xlsx')) {
       setErrorFA04a('El archivo no tiene el formato válido (.xlsx).');
       return;
     }
@@ -64,6 +66,7 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
       }
       
       resumenCarga = { nuevos: [], inscritosExistentes: 0, reactivados: 0, omitidos: 0, rechazados: [], total: 0 };
+      const controlesVistos = new Set();
 
       for (let i = 1; i < filas.length; i++) {
         const fila = filas[i];
@@ -76,14 +79,22 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
 
         resumenCarga.total++;
 
-        if (!datoControl || datoControl.length < 5) {
-          resumenCarga.rechazados.push(`Fila ${numeroFilaExcel}: No. de Control inválido o vacío.`);
+        // RF006: rechaza la fila si falta el no. de control o no cumple su formato
+        const errorNoControl = validarNoControl(datoControl);
+        if (errorNoControl) {
+          resumenCarga.rechazados.push(`Fila ${numeroFilaExcel}: ${errorNoControl}.`);
           continue;
         }
         if (!datoNombreCompleto) {
           resumenCarga.rechazados.push(`Fila ${numeroFilaExcel}: Nombre completo vacío.`);
           continue;
         }
+        // RF006: filas repetidas dentro del mismo archivo se omiten
+        if (controlesVistos.has(datoControl.toUpperCase())) {
+          resumenCarga.omitidos++;
+          continue;
+        }
+        controlesVistos.add(datoControl.toUpperCase());
 
         // Lógica de separación de nombres (Paterno Materno Nombres)
         let nombreReal = '';
@@ -102,8 +113,17 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
             nombreReal = datoNombreCompleto;
         }
 
+        // RF006: rechaza la fila si falta el nombre o el apellido paterno, o excede longitudes (RF005)
+        const errorDatos = validarDatosAlumno({
+          noControl: datoControl, nombre: nombreReal, apellidoPaterno: apPaterno, apellidoMaterno: apMaterno
+        });
+        if (errorDatos) {
+          resumenCarga.rechazados.push(`Fila ${numeroFilaExcel}: ${errorDatos}.`);
+          continue;
+        }
+
         const correo = `l${datoControl}@chilpancingo.tecnm.mx`;
-        const passwordTemporal = `${datoControl}2026`;
+        const passwordTemporal = datoControl; // RF007: contraseña inicial = número de control
 
         try {
           // Validar si ya está en esta clase (Omitido o Reactivado)
@@ -146,13 +166,17 @@ export const ModalCargaMasiva = ({ setModalActual, idClase, onActualizacion }) =
             resumenCarga.inscritosExistentes++;
           } else {
             // Es totalmente nuevo: Registrarlo e inscribirlo
-            await supabase.from('alumno').insert([{
+            const { error: errAlumno } = await supabase.from('alumno').insert([{
               no_control: datoControl,
               nombre: nombreReal,
               apellido_paterno: apPaterno,
               apellido_materno: apMaterno,
               correo: correo
             }]);
+            if (errAlumno) throw errAlumno;
+
+            // RF007: cuenta de acceso del alumno nuevo
+            await crearCuentaAlumno(datoControl);
 
             await supabase.from('inscripcion_clase').insert([{
               id_clase: idClase,

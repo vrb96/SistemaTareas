@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import { theme } from '../theme';
 import { supabase } from '../supa/supabaseClient';
+import { crearCuentaAlumno } from '../services/authService';
+import { validarDatosAlumno } from '../validaciones';
 
 export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion }) => {
   const [noControl, setNoControl] = useState('');
@@ -24,8 +26,9 @@ export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion 
     setError('');
     setCargando(true);
 
-    if (!noControl.trim() || !nombre.trim() || !apellidoPaterno.trim()) {
-      setError('Faltan datos obligatorios (No. Control, Nombre, Apellido Paterno)');
+    const errorValidacion = validarDatosAlumno({ noControl, nombre, apellidoPaterno, apellidoMaterno });
+    if (errorValidacion) {
+      setError(errorValidacion);
       setCargando(false);
       return;
     }
@@ -56,7 +59,7 @@ export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion 
 
         if (inscripcionPrevia) {
           if (inscripcionPrevia.estado_inscripcion === 'Activa') {
-            throw new Error('El alumno ya se encuentra inscrito y activo en esta clase.');
+            throw new Error('El alumno ya está inscrito en esta clase');
           } else {
             // FA_06 (Paso 1): Ofrece la reactivación (pausamos el proceso)[cite: 27]
             setAlumnoInactivoEncontrado(inscripcionPrevia);
@@ -97,6 +100,9 @@ export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion 
             correo: correoFinal
           }]);
         if (insertAlumnoError) throw insertAlumnoError;
+
+        // RF007: cuenta de acceso (contraseña inicial = no. de control, cambio pendiente)
+        await crearCuentaAlumno(noControl.trim());
 
         const { error: insertInscripcionError } = await supabase
           .from('inscripcion_clase')
@@ -201,23 +207,23 @@ export const ModalRegistrarAlumno = ({ idClase, setModalActual, onActualizacion 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
                 <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Número de Control:</label>
-                <input type="text" value={noControl} onChange={(e) => setNoControl(e.target.value)} placeholder="Ej. 20050012" 
+                <input type="text" value={noControl} onChange={(e) => setNoControl(e.target.value)} maxLength={9} placeholder="Ej. 20050012" 
                        className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
               </div>
               <div>
                 <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Nombre:</label>
-                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Carlos" 
+                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={50} placeholder="Ej. Carlos" 
                        className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
               </div>
               <div className="flex gap-2">
                 <div className="w-1/2">
                   <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Paterno:</label>
-                  <input type="text" value={apellidoPaterno} onChange={(e) => setApellidoPaterno(e.target.value)} placeholder="Paterno" 
+                  <input type="text" value={apellidoPaterno} onChange={(e) => setApellidoPaterno(e.target.value)} maxLength={50} placeholder="Paterno" 
                          className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
                 </div>
                 <div className="w-1/2">
                   <label className={`text-[15pt] ${theme.textContenedor} ${theme.font} block mb-1`}>Apellido Materno:</label>
-                  <input type="text" value={apellidoMaterno} onChange={(e) => setApellidoMaterno(e.target.value)} placeholder="Materno" 
+                  <input type="text" value={apellidoMaterno} onChange={(e) => setApellidoMaterno(e.target.value)} maxLength={50} placeholder="Materno" 
                          className="w-full p-2 border border-gray-400 rounded bg-white text-center text-[16pt]" />
                 </div>
               </div>
